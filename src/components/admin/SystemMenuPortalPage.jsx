@@ -27,7 +27,7 @@ import { can } from "../auth/permission";
 
 export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
     const { user } = auth || {};
-    const [activeTool, setActiveTool] = useState(null);
+    const [activeTool, setActiveTool] = useState(null); // 'users' | 'permissions' | 'menus' | 'roles' | null
 
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -39,7 +39,7 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
         );
     }, [user]);
 
-    // สิทธิ์ใน System Menu
+    // สิทธิ์ย่อยใน System Menu
     const canUsers = can(user, "portal.admin.users.view") || user?.is_superuser;
     const canPermissions =
         can(user, "portal.admin.permissions.manage") || user?.is_superuser;
@@ -47,13 +47,6 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
         can(user, "portal.admin.menus.manage") || user?.is_superuser;
     const canRoles =
         can(user, "portal.admin.roles.manage") || user?.is_superuser;
-
-    const initials = (displayName || "?")
-        .split(" ")
-        .map((x) => x[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
 
     return (
         <AppShell
@@ -83,7 +76,6 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
                         <Text size="sm" c="dimmed">
                             {displayName}
                         </Text>
-                        {/* ✅ ปุ่ม Back to Portal กลับมาแล้ว */}
                         <Button
                             variant="subtle"
                             size="xs"
@@ -106,80 +98,66 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
         >
             <Container size="lg" py="md">
                 <Stack gap="md">
-                    {/* Header Card */}
+                    {/* Header / User info card */}
                     <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-                        {/* TOP: Title + description */}
-                        <Stack gap={4} mb="sm">
-                            <Group gap="xs" align="center">
+                        <Group justify="space-between" align="flex-start">
+                            <Stack gap={6}>
                                 <Title order={4}>System administration center</Title>
-                                <Badge size="xs" radius="lg" variant="light" color="blue">
-                                    ADMIN CENTER
-                                </Badge>
-                            </Group>
-
-                            <Text size="xs" c="dimmed">
-                                ศูนย์กลางสำหรับจัดการผู้ใช้งาน, สิทธิ์การเข้าถึง, เมนูระบบ
-                                และโครงสร้างบทบาท (Roles) เพื่อควบคุมการเข้าถึงระบบย่อยทั้งหมดใน{" "}
-                                <Text component="span" fw={500}>
-                                    YTRC Portal Center
-                                </Text>
-                            </Text>
-                        </Stack>
-
-                        <Divider my="sm" />
-
-                        {/* BOTTOM: Avatar + user info */}
-                        <Group align="flex-start" gap="md">
-                            <Box
-                                style={{
-                                    width: 58,
-                                    height: 58,
-                                    borderRadius: "999px",
-                                    background: "linear-gradient(135deg, #3b82f6, #0ea5e9)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontWeight: 700,
-                                    fontSize: 20,
-                                    color: "white",
-                                }}
-                            >
-                                {initials}
-                            </Box>
-
-                            <Stack gap={4}>
-                                <Text fw={600} size="sm">
-                                    {displayName}
+                                <Text size="xs" c="dimmed">
+                                    ศูนย์กลางสำหรับจัดการผู้ใช้งาน, สิทธิ์การเข้าถึง, เมนูระบบ และโครงสร้างบทบาท (Roles)
+                                    เพื่อควบคุมการเข้าถึงระบบย่อยทั้งหมดใน YTRC Portal Center
                                 </Text>
 
-                                {user?.email && (
-                                    <Code fz={11} mt={-2}>
-                                        {user.email}
-                                    </Code>
-                                )}
+                                <Divider my={6} />
+
+                                <Text size="xs" fw={500}>
+                                    Signed in as
+                                </Text>
+                                <Text size="sm">
+                                    {displayName || "-"}{" "}
+                                    {user?.email && (
+                                        <Text component="span" size="xs" c="dimmed">
+                                            ({user.email})
+                                        </Text>
+                                    )}
+                                </Text>
 
                                 <Group gap={8} mt={4}>
                                     {user?.department && (
                                         <Badge variant="light" color="teal" size="xs">
-                                            DEPT: {user.department}
+                                            Dept: {user.department}
                                         </Badge>
                                     )}
                                     {user?.position && (
                                         <Badge variant="light" color="blue" size="xs">
-                                            POSITION: {user.position}
+                                            Position: {user.position}
                                         </Badge>
                                     )}
                                     {user?.role && (
                                         <Badge variant="light" color="violet" size="xs">
-                                            ROLE: {user.role}
+                                            Role: {user.role}
                                         </Badge>
                                     )}
                                 </Group>
                             </Stack>
+
+                            <Stack gap={8} align="flex-end">
+                                <Text size="xs" c="dimmed">
+                                    การจัดการระดับระบบ
+                                </Text>
+                                <Button
+                                    variant="light"
+                                    size="xs"
+                                    leftSection={<IconArrowLeft size={14} />}
+                                    onClick={onBack}
+                                >
+                                    Back to Portal
+                                </Button>
+                            </Stack>
                         </Group>
                     </Card>
 
-                    {/* System App Cards */}
+                    {/* System applications cards (layout แบบเดียวกับ PortalCenterPage) */}
                     <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
                         <Group justify="space-between" mb="xs">
                             <Text fw={600}>System applications</Text>
@@ -193,44 +171,68 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
                         </Text>
 
                         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" mt="md">
+                            {/* User management */}
                             <SystemAppCard
                                 title="User management"
-                                description="จัดการผู้ใช้งานทั้งหมด"
+                                description="จัดการผู้ใช้งาน: สร้าง/แก้ไข/ระงับบัญชี, reset password และ mapping กับแผนก/ตำแหน่ง."
                                 color="blue"
                                 icon={IconUsers}
                                 active={activeTool === "users"}
                                 disabled={!canUsers}
-                                onClick={() => setActiveTool("users")}
+                                onClick={() => {
+                                    if (!canUsers) return;
+                                    setActiveTool("users");
+                                    console.log("[System Menu] go to User management");
+                                    // TODO: ต่อหน้า User Management จริงในอนาคต
+                                }}
                             />
 
+                            {/* Permission manager */}
                             <SystemAppCard
                                 title="Permission manager"
-                                description="จัดการสิทธิ์การเข้าถึงระบบ"
+                                description="จัดการสิทธิ์ (permissions) และผูกสิทธิ์กับผู้ใช้หรือ role."
                                 color="grape"
                                 icon={IconKey}
                                 active={activeTool === "permissions"}
                                 disabled={!canPermissions}
-                                onClick={() => setActiveTool("permissions")}
+                                onClick={() => {
+                                    if (!canPermissions) return;
+                                    setActiveTool("permissions");
+                                    console.log("[System Menu] go to Permission manager");
+                                    // TODO: ต่อหน้า Permission Manager จริง
+                                }}
                             />
 
+                            {/* Menu & navigation */}
                             <SystemAppCard
                                 title="Menu & navigation"
-                                description="ควบคุมเมนูระบบและหน้าแสดงผล"
+                                description="กำหนดเมนู, navigation, และการแสดงผลให้สอดคล้องกับ role / แผนก (side menu, topbar)."
                                 color="cyan"
                                 icon={IconLayoutSidebarRightExpand}
                                 active={activeTool === "menus"}
                                 disabled={!canMenus}
-                                onClick={() => setActiveTool("menus")}
+                                onClick={() => {
+                                    if (!canMenus) return;
+                                    setActiveTool("menus");
+                                    console.log("[System Menu] go to Menu management");
+                                    // TODO: ต่อหน้า Menu Management
+                                }}
                             />
 
+                            {/* Roles & policies */}
                             <SystemAppCard
                                 title="Roles & policies"
-                                description="กำหนดโครงสร้างบทบาท ผู้ใช้"
+                                description="ออกแบบ role (เช่น Admin, QA, Stock Controller) และรวมสิทธิ์หลายตัวเป็น policy เดียว."
                                 color="orange"
                                 icon={IconHierarchy2}
                                 active={activeTool === "roles"}
                                 disabled={!canRoles}
-                                onClick={() => setActiveTool("roles")}
+                                onClick={() => {
+                                    if (!canRoles) return;
+                                    setActiveTool("roles");
+                                    console.log("[System Menu] go to Roles & policies");
+                                    // TODO: ต่อหน้า Role Management
+                                }}
                             />
                         </SimpleGrid>
 
@@ -238,12 +240,25 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
 
                         <Box>
                             <Text size="xs" c="dimmed" mb={4}>
-                                Selected module:
+                                Selected system tool:
                             </Text>
                             <Code fz={12}>
-                                {activeTool || "ยังไม่ได้เลือก module"}
+                                {activeTool === "users" &&
+                                    "User management — จัดการบัญชีผู้ใช้งานและข้อมูลพื้นฐาน"}
+                                {activeTool === "permissions" &&
+                                    "Permission manager — จัดการสิทธิ์และการผูกสิทธิ์"}
+                                {activeTool === "menus" &&
+                                    "Menu & navigation — กำหนดเมนูและโครงสร้างการนำทางของระบบ"}
+                                {activeTool === "roles" &&
+                                    "Roles & policies — ออกแบบบทบาทและนโยบายการเข้าถึงระบบ"}
+                                {!activeTool &&
+                                    "ยังไม่ได้เลือก module (คลิกที่การ์ดด้านบนเพื่อเริ่มจัดการ System Menu)"}
                             </Code>
                         </Box>
+
+                        <Text size="xs" c="dimmed" mt="xs">
+                            * บาง module อาจถูกปิดการใช้งานขึ้นกับสิทธิ์การเข้าถึงของบัญชีผู้ใช้
+                        </Text>
                     </Card>
                 </Stack>
             </Container>
@@ -251,7 +266,10 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
     );
 }
 
-/* System menu card component */
+/**
+ * รูปแบบการ์ดของ System Menu
+ * - ให้หน้าตาและ behavior ใกล้เคียง AppCardBig ใน PortalCenterPage
+ */
 function SystemAppCard({
     title,
     description,
@@ -267,7 +285,9 @@ function SystemAppCard({
         <Card
             radius="md"
             withBorder
-            onClick={() => !disabled && onClick()}
+            onClick={() => {
+                if (!disabled && onClick) onClick();
+            }}
             style={{
                 cursor: disabled ? "not-allowed" : "pointer",
                 padding: "18px 16px",
@@ -282,23 +302,24 @@ function SystemAppCard({
                         ? "rgba(59, 130, 246, 0.9)"
                         : "rgba(226,232,240,1)",
                 opacity: disabled ? 0.6 : 1,
-                transition: "150ms ease",
+                transition:
+                    "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease",
             }}
             shadow={isActive ? "md" : "xs"}
         >
-            <Group align="flex-start" gap="md">
+            <Group align="flex-start" gap="md" wrap="nowrap">
                 <Box
                     style={{
                         width: 42,
                         height: 42,
                         borderRadius: 12,
-                        backgroundColor: `var(--mantine-color-${color}-0, #e0f2fe)`,
+                        backgroundColor: `var(--mantine-color-${color}-0, #eff6ff)`,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                     }}
                 >
-                    <Icon size={22} color={`var(--mantine-color-${color}-6)`} />
+                    <Icon size={24} color={`var(--mantine-color-${color}-6, #2563eb)`} />
                 </Box>
 
                 <Stack gap={4} style={{ flex: 1 }}>
@@ -306,7 +327,6 @@ function SystemAppCard({
                         <Text fw={600} size="sm">
                             {title}
                         </Text>
-
                         <Badge
                             variant={disabled ? "outline" : isActive ? "filled" : "light"}
                             color={disabled ? "gray" : color}
@@ -316,7 +336,6 @@ function SystemAppCard({
                             {disabled ? "No access" : isActive ? "Selected" : "Available"}
                         </Badge>
                     </Group>
-
                     <Text size="xs" c="dimmed">
                         {description}
                     </Text>
