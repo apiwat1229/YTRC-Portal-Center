@@ -2,7 +2,6 @@ import {
     AppShell,
     Badge,
     Box,
-    Button,
     Card,
     Code,
     Container,
@@ -12,18 +11,14 @@ import {
     Stack,
     Text
 } from "@mantine/core";
-import { modals } from "@mantine/modals";
 import {
     IconCalendarTime,
     IconDropletHalf2,
-    IconGridDots,
-    IconLock,
     IconPackages,
     IconQrcode,
     IconSettings,
     IconTools,
     IconTruck,
-    IconUser,
     IconUsersGroup
 } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
@@ -62,145 +57,27 @@ export default function PortalCenterPage({
     const canManagePermissions =
         can(user, "portal.admin.permissions.manage") || user?.is_superuser;
 
-    const openProfileModal = () => {
-        const name = displayName || user?.username || user?.email || "";
-        modals.open({
-            title: "ข้อมูลบัญชีผู้ใช้งาน",
-            radius: "md",
-            size: "lg",
-            children: (
-                <Stack gap="sm">
-                    <Stack gap={2}>
-                        <Text fw={600} size="sm">
-                            {name || "-"}
-                        </Text>
-                        {user?.email && (
-                            <Text size="xs" c="dimmed">
-                                {user.email}
-                            </Text>
-                        )}
-                    </Stack>
-
-                    <Group gap={8}>
-                        {user?.department && (
-                            <Badge variant="light" color="teal" size="xs">
-                                DEPT: {user.department}
-                            </Badge>
-                        )}
-                        {user?.position && (
-                            <Badge variant="light" color="blue" size="xs">
-                                POSITION: {user.position}
-                            </Badge>
-                        )}
-                        {user?.role && (
-                            <Badge variant="light" color="violet" size="xs">
-                                ROLE: {user.role}
-                            </Badge>
-                        )}
-                    </Group>
-
-                    <Text size="xs" c="dimmed">
-                        บัญชีนี้ใช้สำหรับเข้าถึง Portal ต่าง ๆ ของ YTRC เช่น QR, Cuplump,
-                        Booking Queue, TruckScale, Contact Management และ System Menu
-                        ตามสิทธิ์ที่ได้รับ
-                    </Text>
-                </Stack>
-            )
-        });
-    };
-
-    const openLogoutConfirm = () => {
-        if (typeof onLogout !== "function") return;
-        modals.openConfirmModal({
-            title: "ออกจากระบบ",
-            centered: true,
-            children: (
-                <Text size="sm">
-                    คุณต้องการออกจากระบบ{" "}
-                    <Text component="span" fw={600}>
-                        YTRC Portal Center
-                    </Text>{" "}
-                    ใช่หรือไม่?
-                </Text>
-            ),
-            labels: { confirm: "ยืนยันออกจากระบบ", cancel: "ยกเลิก" },
-            confirmProps: { color: "red" },
-            onConfirm: () => onLogout()
-        });
-    };
-
+    // ไม่ใช้ Header แล้ว → AppShell ไม่มี header
     return (
         <AppShell
             padding="md"
-            header={{ height: 64 }}
             styles={{
                 main: {
                     backgroundColor: "#f5f7fb"
                 }
             }}
         >
-            <AppShell.Header>
-                <Group
-                    h="100%"
-                    px="md"
-                    justify="space-between"
-                    style={{
-                        borderBottom: "1px solid rgba(226, 232, 240, 1)",
-                        backgroundColor: "white"
-                    }}
-                >
-                    <Group gap="xs">
-                        <IconGridDots size={20} />
-                        <Text fw={600}>YTRC Portal Center</Text>
-                    </Group>
-
-                    <Group gap="sm">
-                        <Text size="sm" c="dimmed">
-                            {displayName}
-                        </Text>
-
-                        {canManagePermissions && (
-                            <Button
-                                variant="light"
-                                size="xs"
-                                leftSection={<IconLock size={14} />}
-                                onClick={onOpenPermissions}
-                            >
-                                Permissions
-                            </Button>
-                        )}
-
-                        <Button
-                            variant="subtle"
-                            size="xs"
-                            leftSection={<IconUser size={14} />}
-                            onClick={openProfileModal}
-                        >
-                            Profile
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="xs"
-                            color="gray"
-                            onClick={openLogoutConfirm}
-                        >
-                            Logout
-                        </Button>
-                    </Group>
-                </Group>
-            </AppShell.Header>
-
             <AppShell.Main>
                 <Container size="lg" py="md">
                     <Stack gap="md">
+
+                        {/* Account Block */}
                         <AccountInfoBlock user={user} onLogout={onLogout} />
 
+                        {/* Cards */}
                         <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
                             <Group justify="space-between" mb="xs">
                                 <Text fw={600}>Applications</Text>
-                                <Text size="xs" c="dimmed">
-                                    Back to all categories
-                                </Text>
                             </Group>
 
                             <Text size="xs" c="dimmed" mb="sm">
@@ -231,7 +108,7 @@ export default function PortalCenterPage({
                                     onClick={() => {
                                         if (!canCuplump) return;
                                         setActiveApp("cuplump");
-                                        onOpenCuplumpPortal && onOpenCuplumpPortal();
+                                        onOpenCuplumpPortal?.();
                                     }}
                                 />
 
@@ -263,7 +140,7 @@ export default function PortalCenterPage({
 
                                 <AppCardBig
                                     title="แจ้งซ่อม"
-                                    description="Maintenance requests, breakdown logging, CM/PM tracking สำหรับเครื่องจักรและอุปกรณ์."
+                                    description="Maintenance requests, breakdown logging, CM/PM tracking."
                                     color="orange"
                                     icon={IconTools}
                                     active={activeApp === "maintenance"}
@@ -276,7 +153,7 @@ export default function PortalCenterPage({
 
                                 <AppCardBig
                                     title="ระบบ Stock"
-                                    description="Inventory และ warehouse management, stock levels, in-out transactions."
+                                    description="Inventory / warehouse management."
                                     color="green"
                                     icon={IconPackages}
                                     active={activeApp === "stock"}
@@ -289,7 +166,7 @@ export default function PortalCenterPage({
 
                                 <AppCardBig
                                     title="Contact Management"
-                                    description="จัดการข้อมูลบุคคล, บริษัท, แผนก และช่องทางติดต่อที่เกี่ยวข้องกับ YTRC."
+                                    description="จัดการข้อมูลบุคคล บริษัท แผนก."
                                     color="indigo"
                                     icon={IconUsersGroup}
                                     active={activeApp === "contact"}
@@ -297,13 +174,13 @@ export default function PortalCenterPage({
                                     onClick={() => {
                                         if (!canContact) return;
                                         setActiveApp("contact");
-                                        onOpenContactPortal && onOpenContactPortal();
+                                        onOpenContactPortal?.();
                                     }}
                                 />
 
                                 <AppCardBig
                                     title="System Menu"
-                                    description="ศูนย์กลางการตั้งค่าระบบ: ผู้ใช้, สิทธิ์, เมนู และโครงสร้างระบบหลัก."
+                                    description="ผู้ใช้, สิทธิ์, เมนู และตั้งค่าระบบ"
                                     color="red"
                                     icon={IconSettings}
                                     active={activeApp === "system"}
@@ -311,7 +188,7 @@ export default function PortalCenterPage({
                                     onClick={() => {
                                         if (!canSystemMenu) return;
                                         setActiveApp("system");
-                                        onOpenSystemPortal && onOpenSystemPortal();
+                                        onOpenSystemPortal?.();
                                     }}
                                 />
                             </SimpleGrid>
@@ -323,30 +200,11 @@ export default function PortalCenterPage({
                                     Selected app:
                                 </Text>
                                 <Code fz={12}>
-                                    {activeApp === "qr" &&
-                                        "QR Code — ระบบคิว / บัตรคิว / Ticket / Truck QR"}
-                                    {activeApp === "cuplump" &&
-                                        "Cuplump Management — บริหารจัดการยางก้อนถ้วยแบบครบวงจร"}
-                                    {activeApp === "booking" &&
-                                        "Booking Queue — จัดการคิวรถเข้า–ออกโรงงาน"}
-                                    {activeApp === "truckscale" &&
-                                        "TruckScale — ระบบชั่งน้ำหนักรถ และโยงกับเอกสาร/คิว"}
-                                    {activeApp === "maintenance" &&
-                                        "แจ้งซ่อม — ระบบ Maintenance Request / CM / PM"}
-                                    {activeApp === "stock" &&
-                                        "ระบบ Stock — Inventory / Warehouse / การเบิก-รับสินค้า"}
-                                    {activeApp === "contact" &&
-                                        "Contact Management — ระบบจัดการข้อมูลบุคคล บริษัท และ Contact ที่เกี่ยวข้อง"}
-                                    {activeApp === "system" &&
-                                        "System Menu — ศูนย์กลางการตั้งค่าระบบ เช่น User, Permissions, Menu, Roles"}
-                                    {!activeApp &&
-                                        "ยังไม่ได้เลือกแอปย่อย (คลิกที่การ์ดด้านบนเพื่อเริ่มใช้งาน)"}
+                                    {!activeApp
+                                        ? "ยังไม่ได้เลือกแอปย่อย"
+                                        : activeApp}
                                 </Code>
                             </Box>
-
-                            <Text size="xs" c="dimmed" mt="xs">
-                                * บางแอปอาจถูกปิดการใช้งานขึ้นกับสิทธิ์การเข้าถึงของบัญชีผู้ใช้
-                            </Text>
                         </Card>
                     </Stack>
                 </Container>
@@ -355,15 +213,7 @@ export default function PortalCenterPage({
     );
 }
 
-function AppCardBig({
-    title,
-    description,
-    color,
-    icon: Icon,
-    active,
-    disabled,
-    onClick
-}) {
+function AppCardBig({ title, description, color, icon: Icon, active, disabled, onClick }) {
     const isActive = active && !disabled;
 
     return (
@@ -371,7 +221,7 @@ function AppCardBig({
             radius="md"
             withBorder
             onClick={() => {
-                if (!disabled && onClick) onClick();
+                if (!disabled) onClick?.();
             }}
             style={{
                 cursor: disabled ? "not-allowed" : "pointer",
@@ -387,8 +237,7 @@ function AppCardBig({
                         ? "rgba(59, 130, 246, 0.9)"
                         : "rgba(226,232,240,1)",
                 opacity: disabled ? 0.6 : 1,
-                transition:
-                    "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease"
+                transition: "all 120ms ease"
             }}
             shadow={isActive ? "md" : "xs"}
         >

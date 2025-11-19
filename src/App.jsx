@@ -2,49 +2,27 @@
 import { useState } from "react";
 import LoginScreen from "./components/auth/LoginScreen";
 import PortalCenterPage from "./components/portal/PortalCenterPage";
-import TitleBar from "./components/window/TitleBar";
 
 export default function App() {
   const [auth, setAuth] = useState(null);
 
   const handleLoginSuccess = (data) => {
-    setAuth(data);
+    setAuth(data); // data.user, token ฯลฯ
   };
 
   const handleLogout = () => {
     setAuth(null);
   };
 
-  const content = !auth ? (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+  if (!auth) {
+    // ยังไม่ได้ล็อกอิน → แสดงหน้า Login อย่างเดียว
+    return (
       <LoginScreen onSuccess={handleLoginSuccess} />
-    </div>
-  ) : (
-    <div style={{ flex: 1, minHeight: 0 }}>
-      <PortalCenterPage auth={auth} onLogout={handleLogout} />
-    </div>
-  );
+    );
+  }
 
+  // ล็อกอินแล้ว → แสดง PortalCenterPage
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#f3f4f6",
-        overflow: "hidden",
-      }}
-    >
-      <TitleBar />
-      {content}
-    </div>
+    <PortalCenterPage auth={auth} onLogout={handleLogout} />
   );
 }
