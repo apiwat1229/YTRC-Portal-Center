@@ -1,50 +1,117 @@
 // src/components/portal/PortalCenterPage.jsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
     AppShell,
+    Avatar,
     Badge,
     Box,
     Card,
-    Code,
     Container,
-    Divider,
     Group,
+    Indicator,
     SimpleGrid,
     Stack,
     Text,
+    ThemeIcon,
+    Tooltip,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import {
+    IconActivity,
     IconCalendarTime,
+    IconCpu,
     IconDropletHalf2,
+    IconLogout,
     IconPackages,
     IconQrcode,
+    IconServer,
     IconSettings,
     IconTools,
     IconTruck,
     IconUsersGroup,
 } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { can } from "../auth/permission";
-import AccountInfoBlock from "../common/AccountInfoBlock";
 
-// helper: เรียก can แบบสั้น ๆ
-function canView(user, required) {
-    return can(user, required);
+import { can } from "../auth/permission";
+
+// ---------------- Helper: Permission ----------------
+function canView(user, permission) {
+    return can(user, permission);
 }
 
+// ---------------- Sub-Component: Realtime Clock ----------------
+function RealtimeClock() {
+    const [date, setDate] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setDate(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    return (
+        <Stack gap={0} align="flex-end" style={{ lineHeight: 1 }}>
+            <Text
+                size="lg"
+                fw={700}
+                style={{
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "-0.5px",
+                }}
+            >
+                {date.toLocaleTimeString("th-TH", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })}
+            </Text>
+            <Text size="xs" c="dimmed" fw={500}>
+                {date.toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                })}
+            </Text>
+        </Stack>
+    );
+}
+
+// ---------------- Sub-Component: Gradient Pill (DEPT / POSITION / ROLE) ----------------
+function GradientPill({ label, value, from, to }) {
+    if (!value) return null;
+
+    return (
+        <Box
+            px="xs"
+            py={4}
+            style={{
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                backgroundImage: `linear-gradient(90deg, ${from}, ${to})`,
+                color: "#0f172a",
+                boxShadow: "0 0 18px rgba(148, 163, 184, 0.35)",
+            }}
+        >
+            {label}: {value}
+        </Box>
+    );
+}
+
+// ---------------- Main Component ----------------
 export default function PortalCenterPage({
     auth,
     onLogout,
-    onOpenPermissions,
     onOpenContactPortal,
     onOpenSystemPortal,
     onOpenCuplumpPortal,
 }) {
     const { user } = auth || {};
-    const [activeApp, setActiveApp] = useState(null);
     const navigate = useNavigate();
+    const [activeApp, setActiveApp] = useState(null);
 
+    // ชื่อที่โชว์ใน Header
     const displayName = useMemo(() => {
         if (!user) return "";
         return (
@@ -65,257 +132,501 @@ export default function PortalCenterPage({
     const canContact = canView(user, "portal.app.contact.view");
     const canSystemMenu = canView(user, "portal.app.system_menu.view");
 
+    // ---------------- Profile Modal ----------------
     const openProfileModal = () => {
-        const name = displayName || user?.username || user?.email || "";
+        if (!user) return;
+
         modals.open({
-            title: "ข้อมูลบัญชีผู้ใช้งาน",
+            title: <Text fw={700}>User Profile</Text>,
             radius: "md",
             size: "lg",
             children: (
-                <Stack gap="sm">
-                    <Stack gap={2}>
-                        <Text fw={600} size="sm">
-                            {name || "-"}
-                        </Text>
-                        {user?.email && (
-                            <Text size="xs" c="dimmed">
-                                {user.email}
+                <Stack gap="md">
+                    {/* Header: Avatar + Name + Email */}
+                    <Group align="center" gap="md">
+                        <Avatar size={64} radius="xl" color="blue">
+                            {displayName?.charAt(0)}
+                        </Avatar>
+                        <Stack gap={2}>
+                            <Text fw={700} size="lg">
+                                {displayName}
                             </Text>
-                        )}
-                    </Stack>
-
-                    <Group gap={8}>
-                        {user?.department && (
-                            <Badge variant="light" color="teal" size="xs">
-                                DEPT: {user.department}
-                            </Badge>
-                        )}
-                        {user?.position && (
-                            <Badge variant="light" color="blue" size="xs">
-                                POSITION: {user.position}
-                            </Badge>
-                        )}
-                        {user?.role && (
-                            <Badge variant="light" color="violet" size="xs">
-                                ROLE: {user.role}
-                            </Badge>
-                        )}
+                            {user.email && (
+                                <Text size="xs" c="dimmed">
+                                    {user.email}
+                                </Text>
+                            )}
+                        </Stack>
                     </Group>
 
+                    {/* Description */}
                     <Text size="xs" c="dimmed">
-                        บัญชีนี้ใช้สำหรับเข้าถึง Portal ต่าง ๆ ของ YTRC เช่น QR, Cuplump, Booking
-                        Queue, TruckScale, Contact Management และ System Menu ตามสิทธิ์ที่ได้รับ
+                        คุณกำลังใช้งาน{" "}
+                        <Text component="span" fw={600}>
+                            YTRC Portal Center
+                        </Text>{" "}
+                        เพื่อเข้าถึงระบบภายใน เช่น QR, Cuplump, Booking Queue,
+                        TruckScale, แจ้งซ่อม, Stock, Contact Management และ System
+                        Config ตามสิทธิ์การใช้งานของคุณ
                     </Text>
+
+                    {/* Gradient Role Pills */}
+                    <Group gap={8}>
+                        <GradientPill
+                            label="DEPT"
+                            value={user?.department}
+                            from="#bbf7d0"
+                            to="#a5f3fc"
+                        />
+                        <GradientPill
+                            label="POSITION"
+                            value={user?.position}
+                            from="#bfdbfe"
+                            to="#e0f2fe"
+                        />
+                        <GradientPill
+                            label="ROLE"
+                            value={user?.role}
+                            from="#ede9fe"
+                            to="#e0f2fe"
+                        />
+                    </Group>
+
+                    {/* Detail Grid */}
+                    <SimpleGrid cols={2} mt="sm">
+                        <Box p="xs" bg="gray.0" style={{ borderRadius: 8 }}>
+                            <Text
+                                size="xs"
+                                c="dimmed"
+                                tt="uppercase"
+                                fw={700}
+                                mb={4}
+                            >
+                                Username
+                            </Text>
+                            <Text size="sm" fw={500}>
+                                {user?.username || "-"}
+                            </Text>
+                        </Box>
+
+                        <Box p="xs" bg="gray.0" style={{ borderRadius: 8 }}>
+                            <Text
+                                size="xs"
+                                c="dimmed"
+                                tt="uppercase"
+                                fw={700}
+                                mb={4}
+                            >
+                                Department
+                            </Text>
+                            <Text size="sm" fw={500}>
+                                {user?.department || "-"}
+                            </Text>
+                        </Box>
+
+                        <Box p="xs" bg="gray.0" style={{ borderRadius: 8 }}>
+                            <Text
+                                size="xs"
+                                c="dimmed"
+                                tt="uppercase"
+                                fw={700}
+                                mb={4}
+                            >
+                                Position
+                            </Text>
+                            <Text size="sm" fw={500}>
+                                {user?.position || "-"}
+                            </Text>
+                        </Box>
+
+                        <Box p="xs" bg="gray.0" style={{ borderRadius: 8 }}>
+                            <Text
+                                size="xs"
+                                c="dimmed"
+                                tt="uppercase"
+                                fw={700}
+                                mb={4}
+                            >
+                                Role
+                            </Text>
+                            <Text size="sm" fw={500}>
+                                {user?.role || "-"}
+                            </Text>
+                        </Box>
+                    </SimpleGrid>
+
+                    {/* Permissions summary (ถ้ามี) */}
+                    {Array.isArray(user?.permissions) &&
+                        user.permissions.length > 0 && (
+                            <Box>
+                                <Text
+                                    size="xs"
+                                    c="dimmed"
+                                    mb={4}
+                                    fw={600}
+                                    tt="uppercase"
+                                >
+                                    Permissions ({user.permissions.length})
+                                </Text>
+                                <Group gap={6}>
+                                    {user.permissions.slice(0, 6).map((p) => (
+                                        <Badge
+                                            key={p}
+                                            size="xs"
+                                            variant="light"
+                                            color="gray"
+                                        >
+                                            {p}
+                                        </Badge>
+                                    ))}
+                                    {user.permissions.length > 6 && (
+                                        <Text size="xs" c="dimmed">
+                                            + {user.permissions.length - 6} more
+                                        </Text>
+                                    )}
+                                </Group>
+                            </Box>
+                        )}
                 </Stack>
             ),
         });
     };
 
+    // ---------------- Logout Confirm ----------------
     const openLogoutConfirm = () => {
         if (typeof onLogout !== "function") return;
         modals.openConfirmModal({
-            title: "ออกจากระบบ",
+            title: "Confirm Logout",
             centered: true,
-            children: (
-                <Text size="sm">
-                    คุณต้องการออกจากระบบ{" "}
-                    <Text component="span" fw={600}>
-                        YTRC Portal Center
-                    </Text>{" "}
-                    ใช่หรือไม่?
-                </Text>
-            ),
-            labels: { confirm: "ยืนยันออกจากระบบ", cancel: "ยกเลิก" },
+            children: <Text size="sm">คุณต้องการออกจากระบบใช่หรือไม่?</Text>,
+            labels: { confirm: "Logout", cancel: "Cancel" },
             confirmProps: { color: "red" },
-            onConfirm: () => onLogout(),
+            onConfirm: onLogout,
         });
     };
 
-    // แปลง activeApp → ข้อความรายละเอียด
-    const selectedDescription = useMemo(() => {
-        switch (activeApp) {
-            case "qr":
-                return "QR Code — ระบบคิว / บัตรคิว / Ticket / Truck QR และ workflow ที่อิงกับ QR ภายในโรงงาน";
-            case "cuplump":
-                return "Cuplump Management — บริหารจัดการยางก้อนถ้วย: รับซื้อ, Quality, Warehouse, Reports แบบครบวงจร";
-            case "booking":
-                return "Booking Queue — จัดการคิวการส่งของ / Truck booking สำหรับโรงงาน พร้อมจัดสรรช่วงเวลาเข้า–ออก";
-            case "truckscale":
-                return "TruckScale — ระบบชั่งน้ำหนักรถเข้า–ออก และเชื่อมโยงกับคิว, บิล และเอกสารอื่น ๆ";
-            case "maintenance":
-                return "แจ้งซ่อม — Maintenance Request / Breakdown logging / CM / PM สำหรับเครื่องจักรและอุปกรณ์";
-            case "stock":
-                return "ระบบ Stock — Inventory & Warehouse management, สต็อกสินค้า, การรับ–จ่าย และการติดตามจำนวนคงเหลือ";
-            case "contact":
-                return "Contact Management — ระบบจัดการข้อมูลบุคคล บริษัท แผนก และช่องทางติดต่อที่เกี่ยวข้องกับ YTRC";
-            case "system":
-                return "System Menu — ศูนย์กลางการตั้งค่าระบบ: ผู้ใช้, สิทธิ์ (Permissions), เมนู และโครงสร้างระบบหลัก";
-            default:
-                return "ยังไม่ได้เลือกแอปย่อย (คลิกที่การ์ดด้านบนเพื่อเริ่มใช้งาน)";
-        }
-    }, [activeApp]);
-
     return (
-        <div className="app-bg">
+        <div
+            style={{
+                minHeight: "100vh",
+                backgroundColor: "#f3f4f6",
+                backgroundImage:
+                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%)",
+                fontFamily: "'Outfit', system-ui, sans-serif",
+            }}
+        >
             <AppShell
                 padding="md"
-                styles={{
-                    main: {
-                        backgroundColor: "transparent", // ปล่อยให้เห็น gradient จาก .app-bg
-                    },
-                }}
+                styles={{ main: { backgroundColor: "transparent" } }}
             >
                 <AppShell.Main>
-                    <Container size="lg" py="md">
-                        <Stack gap="md">
-                            {/* ข้อมูล user */}
-                            <AccountInfoBlock
-                                user={user}
-                                onLogout={openLogoutConfirm}
-                                onOpenProfile={openProfileModal}
-                            />
+                    <Container size="xl" py="md">
+                        <Stack gap="xl">
+                            {/* === HEADER SECTION === */}
+                            <Group justify="space-between" align="center">
+                                <Group gap="md">
+                                    <ThemeIcon
+                                        size={48}
+                                        radius="md"
+                                        variant="gradient"
+                                        gradient={{ from: "blue", to: "indigo", deg: 135 }}
+                                    >
+                                        <IconActivity size={28} />
+                                    </ThemeIcon>
+                                    <div>
+                                        <Text
+                                            size="xl"
+                                            fw={800}
+                                            style={{
+                                                letterSpacing: "-0.5px",
+                                                lineHeight: 1.1,
+                                                color: "#1e293b",
+                                            }}
+                                        >
+                                            PORTAL CENTER
+                                        </Text>
+                                        <Text
+                                            size="xs"
+                                            fw={500}
+                                            c="dimmed"
+                                            tt="uppercase"
+                                            style={{ letterSpacing: "1px" }}
+                                        >
+                                            YTRC Operations Hub
+                                        </Text>
+                                    </div>
+                                </Group>
 
-                            {/* การ์ด Applications */}
-                            <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-                                <Group justify="space-between" mb="xs">
-                                    <Text fw={600}>Applications</Text>
-                                    <Text size="xs" c="dimmed">
-                                        เลือกระบบที่ต้องการใช้งานจาก Portal นี้
+                                <Card
+                                    padding="xs"
+                                    radius="md"
+                                    withBorder
+                                    shadow="sm"
+                                    bg="white"
+                                    style={{
+                                        paddingLeft: 20,
+                                        paddingRight: 6,
+                                    }}
+                                >
+                                    <Group gap="xl">
+                                        <RealtimeClock />
+
+                                        <div
+                                            style={{
+                                                height: 24,
+                                                width: 1,
+                                                backgroundColor: "#e2e8f0",
+                                            }}
+                                        />
+
+                                        <Group gap="xs">
+                                            <Group
+                                                gap={8}
+                                                style={{ cursor: "pointer" }}
+                                                onClick={openProfileModal}
+                                            >
+                                                <div style={{ textAlign: "right" }}>
+                                                    <Text
+                                                        size="sm"
+                                                        fw={600}
+                                                        style={{ lineHeight: 1.2 }}
+                                                    >
+                                                        {displayName}
+                                                    </Text>
+                                                    <Text
+                                                        size="xs"
+                                                        c="dimmed"
+                                                        style={{ lineHeight: 1 }}
+                                                    >
+                                                        {user?.role || "User"}
+                                                    </Text>
+                                                </div>
+                                                <Indicator
+                                                    position="bottom-end"
+                                                    color="green"
+                                                    offset={4}
+                                                    size={10}
+                                                    withBorder
+                                                >
+                                                    <Avatar
+                                                        size={38}
+                                                        radius="xl"
+                                                        color="blue"
+                                                        src={null}
+                                                    >
+                                                        {displayName?.charAt(0)}
+                                                    </Avatar>
+                                                </Indicator>
+                                            </Group>
+
+                                            <Tooltip label="Logout">
+                                                <ThemeIcon
+                                                    variant="subtle"
+                                                    color="gray"
+                                                    size="lg"
+                                                    radius="xl"
+                                                    style={{ cursor: "pointer" }}
+                                                    onClick={openLogoutConfirm}
+                                                >
+                                                    <IconLogout size={20} />
+                                                </ThemeIcon>
+                                            </Tooltip>
+                                        </Group>
+                                    </Group>
+                                </Card>
+                            </Group>
+
+                            {/* === DASHBOARD GRID === */}
+                            <Box>
+                                <Group
+                                    justify="space-between"
+                                    mb="md"
+                                    align="flex-end"
+                                >
+                                    <Text
+                                        size="sm"
+                                        fw={600}
+                                        c="dimmed"
+                                        tt="uppercase"
+                                        style={{ letterSpacing: "0.5px" }}
+                                    >
+                                        Applications
                                     </Text>
                                 </Group>
 
-                                <Text size="xs" c="dimmed" mb="sm">
-                                    คลิกเลือกแอปย่อยเพื่อดูรายละเอียด และไปยังระบบนั้น ๆ
-                                </Text>
-
-                                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg" mt="md">
-                                    <AppCardBig
+                                <SimpleGrid
+                                    cols={{ base: 1, xs: 2, md: 3, lg: 4 }}
+                                    spacing="lg"
+                                >
+                                    <AppWidget
                                         title="QR Code"
-                                        description="Queue, booking tickets, truck receive QR และ internal QR-based workflows."
-                                        color="cyan"
+                                        category="MRP Operations"
                                         icon={IconQrcode}
+                                        color="cyan"
+                                        status="Online"
+                                        description="Manage queues, tickets & truck check-ins."
                                         active={activeApp === "qr"}
                                         disabled={!canQR}
-                                        onClick={() => {
-                                            if (!canQR) return;
-                                            setActiveApp("qr");
-                                            // navigate("/qr");
-                                        }}
+                                        onClick={() => setActiveApp("qr")}
                                     />
 
-                                    <AppCardBig
-                                        title="Cuplump Management"
-                                        description="บริหารจัดการยางก้อนถ้วย: รับซื้อ, Quality, Warehouse และ Reports."
-                                        color="teal"
+                                    <AppWidget
+                                        title="Cuplump Pool"
+                                        category="Raw Material"
                                         icon={IconDropletHalf2}
+                                        color="teal"
+                                        status="Active"
+                                        description="Purchasing, quality control & warehousing."
                                         active={activeApp === "cuplump"}
                                         disabled={!canCuplump}
                                         onClick={() => {
-                                            if (!canCuplump) return;
                                             setActiveApp("cuplump");
                                             onOpenCuplumpPortal?.();
                                         }}
                                     />
 
-                                    <AppCardBig
-                                        title="Booking Queue"
-                                        description="จัดการคิวการส่งของ / Truck booking สำหรับโรงงาน."
-                                        color="indigo"
+                                    <AppWidget
+                                        title="Booking"
+                                        category="Logistics"
                                         icon={IconCalendarTime}
+                                        color="indigo"
+                                        status="Online"
+                                        description="Truck slot booking & schedule management."
                                         active={activeApp === "booking"}
                                         disabled={!canBooking}
-                                        onClick={() => {
-                                            if (!canBooking) return;
-                                            setActiveApp("booking");
-                                            // navigate("/booking");
-                                        }}
+                                        onClick={() => setActiveApp("booking")}
                                     />
 
-                                    <AppCardBig
+                                    <AppWidget
                                         title="TruckScale"
-                                        description="จัดการชั่งน้ำหนักรถเข้า–ออก และโยงกับคิว / บิล."
-                                        color="grape"
+                                        category="Weighing"
                                         icon={IconTruck}
+                                        color="grape"
+                                        status="Ready"
+                                        description="Weight capture system & integration."
                                         active={activeApp === "truckscale"}
                                         disabled={!canTruckScale}
-                                        onClick={() => {
-                                            if (!canTruckScale) return;
-                                            setActiveApp("truckscale");
-                                            // navigate("/truckscale");
-                                        }}
+                                        onClick={() => setActiveApp("truckscale")}
                                     />
 
-                                    <AppCardBig
-                                        title="แจ้งซ่อม"
-                                        description="Maintenance requests, breakdown logging, CM/PM tracking."
-                                        color="orange"
+                                    <AppWidget
+                                        title="Maintenance"
+                                        category="Engineering"
                                         icon={IconTools}
+                                        color="orange"
+                                        status="Alert"
+                                        description="CM/PM requests & breakdown tracking."
+                                        alert
                                         active={activeApp === "maintenance"}
                                         disabled={!canMaintenance}
-                                        onClick={() => {
-                                            if (!canMaintenance) return;
-                                            setActiveApp("maintenance");
-                                            // navigate("/maintenance");
-                                        }}
+                                        onClick={() => setActiveApp("maintenance")}
                                     />
 
-                                    <AppCardBig
-                                        title="ระบบ Stock"
-                                        description="Inventory และ warehouse management."
-                                        color="green"
+                                    <AppWidget
+                                        title="Stock"
+                                        category="Inventory"
                                         icon={IconPackages}
+                                        color="green"
+                                        status="Normal"
+                                        description="Warehouse inventory & stock movements."
                                         active={activeApp === "stock"}
                                         disabled={!canStock}
-                                        onClick={() => {
-                                            if (!canStock) return;
-                                            setActiveApp("stock");
-                                            // navigate("/stock");
-                                        }}
+                                        onClick={() => setActiveApp("stock")}
                                     />
 
-                                    <AppCardBig
-                                        title="Contact Management"
-                                        description="จัดการข้อมูลบุคคล บริษัท แผนก และช่องทางติดต่อ."
-                                        color="indigo"
+                                    <AppWidget
+                                        title="Contacts"
+                                        category="CRM"
                                         icon={IconUsersGroup}
+                                        color="blue"
+                                        status="Online"
+                                        description="Supplier & customer database."
                                         active={activeApp === "contact"}
                                         disabled={!canContact}
                                         onClick={() => {
-                                            if (!canContact) return;
                                             setActiveApp("contact");
                                             onOpenContactPortal?.();
-                                            // navigate("/contact");
                                         }}
                                     />
 
-                                    <AppCardBig
-                                        title="System Menu"
-                                        description="ผู้ใช้, สิทธิ์, เมนู และโครงสร้างระบบหลัก."
-                                        color="red"
+                                    <AppWidget
+                                        title="System Config"
+                                        category="Admin"
                                         icon={IconSettings}
+                                        color="red"
+                                        status="Restricted"
+                                        description="User permissions & global settings."
                                         active={activeApp === "system"}
                                         disabled={!canSystemMenu}
                                         onClick={() => {
-                                            if (!canSystemMenu) return;
                                             setActiveApp("system");
                                             onOpenSystemPortal?.();
                                             navigate("/system");
                                         }}
                                     />
                                 </SimpleGrid>
+                            </Box>
 
-                                <Divider my="md" />
-
-                                <Box>
-                                    <Text size="xs" c="dimmed" mb={4}>
-                                        Selected app:
+                            {/* === FOOTER STATUS BAR === */}
+                            <Card
+                                withBorder
+                                padding="xs"
+                                radius="md"
+                                bg="rgba(255,255,255,0.7)"
+                                style={{ backdropFilter: "blur(8px)" }}
+                            >
+                                <Group justify="space-between">
+                                    <Group gap="xl">
+                                        <Group gap={6}>
+                                            <div
+                                                style={{
+                                                    width: 8,
+                                                    height: 8,
+                                                    borderRadius: "50%",
+                                                    backgroundColor: "#22c55e",
+                                                    boxShadow:
+                                                        "0 0 8px #22c55e",
+                                                }}
+                                            />
+                                            <Text
+                                                size="xs"
+                                                fw={600}
+                                                c="dimmed"
+                                            >
+                                                SYSTEM OPERATIONAL
+                                            </Text>
+                                        </Group>
+                                        <Group gap={6}>
+                                            <IconServer
+                                                size={14}
+                                                color="#94a3b8"
+                                            />
+                                            <Text
+                                                size="xs"
+                                                fw={600}
+                                                c="dimmed"
+                                            >
+                                                v0.1.0-stable
+                                            </Text>
+                                        </Group>
+                                        <Group gap={6}>
+                                            <IconCpu
+                                                size={14}
+                                                color="#94a3b8"
+                                            />
+                                            <Text
+                                                size="xs"
+                                                fw={600}
+                                                c="dimmed"
+                                            >
+                                                Latency: 24ms
+                                            </Text>
+                                        </Group>
+                                    </Group>
+                                    <Text size="xs" c="dimmed">
+                                        © 2025 YTRC. All rights reserved.
                                     </Text>
-                                    <Code fz={12}>{selectedDescription}</Code>
-                                </Box>
-
-                                <Text size="xs" c="dimmed" mt="xs">
-                                    * บางแอปอาจถูกปิดการใช้งานขึ้นกับสิทธิ์การเข้าถึงของบัญชีผู้ใช้
-                                </Text>
+                                </Group>
                             </Card>
                         </Stack>
                     </Container>
@@ -325,76 +636,131 @@ export default function PortalCenterPage({
     );
 }
 
-function AppCardBig({
+// ---------------- Modern App Widget Component ----------------
+function AppWidget({
     title,
-    description,
-    color,
+    category,
     icon: Icon,
+    color,
+    status,
+    description,
     active,
     disabled,
     onClick,
+    alert,
 }) {
-    const isActive = active && !disabled;
+    const [hovered, setHovered] = useState(false);
+
+    const themeColor = `var(--mantine-color-${color}-6)`;
 
     return (
         <Card
-            radius="md"
+            padding="lg"
+            radius="lg"
             withBorder
-            onClick={() => {
-                if (!disabled && onClick) onClick();
-            }}
+            bg="white"
+            onClick={() => !disabled && onClick?.()}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
             style={{
                 cursor: disabled ? "not-allowed" : "pointer",
-                padding: "18px 16px",
-                backgroundColor: disabled
-                    ? "#f9fafb"
-                    : isActive
-                        ? "rgba(219, 234, 254, 0.7)"
-                        : "white",
-                borderColor: disabled
-                    ? "rgba(209, 213, 219, 1)"
-                    : isActive
-                        ? "rgba(59, 130, 246, 0.9)"
-                        : "rgba(226,232,240,1)",
                 opacity: disabled ? 0.6 : 1,
                 transition:
-                    "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease",
+                    "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                transform:
+                    hovered && !disabled ? "translateY(-4px)" : "none",
+                boxShadow:
+                    hovered && !disabled
+                        ? "0 18px 28px -12px rgba(15,23,42,0.18)"
+                        : "0 1px 2px rgba(0,0,0,0.05)",
+                position: "relative",
+                overflow: "hidden",
             }}
-            shadow={isActive ? "md" : "xs"}
         >
-            <Group align="flex-start" gap="md" wrap="nowrap">
-                <Box
+            <Group justify="space-between" align="flex-start" mb="md">
+                <ThemeIcon
+                    size={44}
+                    radius={12}
+                    variant="light"
+                    color={color}
                     style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 12,
-                        backgroundColor: `var(--mantine-color-${color}-0, #eff6ff)`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        transition: "all 0.2s ease",
+                        transform:
+                            hovered && !disabled
+                                ? "scale(1.05)"
+                                : "scale(1)",
                     }}
                 >
-                    <Icon size={24} color={`var(--mantine-color-${color}-6, #2563eb)`} />
-                </Box>
+                    <Icon size={24} />
+                </ThemeIcon>
 
-                <Stack gap={4} style={{ flex: 1 }}>
-                    <Group justify="space-between" align="flex-start">
-                        <Text fw={600} size="sm">
-                            {title}
-                        </Text>
-                        <Badge
-                            variant={disabled ? "outline" : isActive ? "filled" : "light"}
-                            color={disabled ? "gray" : color}
-                            radius="lg"
-                            size="xs"
-                        >
-                            {disabled ? "No access" : isActive ? "Selected" : "Available"}
-                        </Badge>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                        {description}
-                    </Text>
-                </Stack>
+                {!disabled && (
+                    <Badge
+                        variant="dot"
+                        color={alert ? "orange" : "green"}
+                        size="xs"
+                        style={{
+                            backgroundColor: "white",
+                            border: "1px solid #e2e8f0",
+                        }}
+                    >
+                        {status}
+                    </Badge>
+                )}
+            </Group>
+
+            <Stack gap={4}>
+                <Text
+                    size="xs"
+                    fw={700}
+                    c="dimmed"
+                    tt="uppercase"
+                    style={{ letterSpacing: "0.5px" }}
+                >
+                    {category}
+                </Text>
+                <Text
+                    size="lg"
+                    fw={700}
+                    c="dark.8"
+                    style={{ letterSpacing: "-0.3px" }}
+                >
+                    {title}
+                </Text>
+                <Text size="xs" c="dimmed" lineClamp={2} h={34}>
+                    {description}
+                </Text>
+            </Stack>
+
+            {/* Action bar */}
+            <Group mt="md" justify="space-between" align="center">
+                <div
+                    style={{
+                        height: 4,
+                        flex: 1,
+                        borderRadius: 2,
+                        background: active ? themeColor : "#f1f5f9",
+                        transition: "background 0.3s ease",
+                    }}
+                />
+
+                {/* Open App text: element อยู่ตลอด แค่ซ่อน/แสดงด้วย style */}
+                <Text
+                    size="xs"
+                    fw={600}
+                    c={color}
+                    style={{
+                        opacity: hovered && !disabled ? 1 : 0,
+                        transform:
+                            hovered && !disabled
+                                ? "translateX(0)"
+                                : "translateX(-5px)",
+                        transition: "opacity 0.2s ease, transform 0.2s ease",
+                        pointerEvents: "none",
+                    }}
+                >
+                    Open App →
+                </Text>
             </Group>
         </Card>
     );

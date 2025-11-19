@@ -230,7 +230,7 @@ export default function UserForm({
                         required
                         value={form.email}
                         onChange={(e) => handleChange("email", e.currentTarget.value)}
-                        description="ใช้เฉพาะอีเมล"
+                        description="ถใช้เฉพาะอีเมล"
                     />
                     <TextInput
                         label="Username"

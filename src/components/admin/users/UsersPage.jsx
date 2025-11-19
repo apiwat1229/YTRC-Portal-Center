@@ -27,6 +27,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { can, isSuperuser } from "../../auth/permission";
+
 import { apiRequest } from "./userApi";
 import UserForm from "./UserForm";
 import UsersTable from "./UsersTable";
@@ -253,7 +254,6 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                 </Badge>
                             </Group>
 
-                            {/* ✅ ฝั่งขวา: เหลือแค่ปุ่ม Back */}
                             <Group gap="sm">
                                 {onBack && (
                                     <Button
@@ -265,6 +265,14 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                         Back
                                     </Button>
                                 )}
+                                <Button
+                                    variant="outline"
+                                    size="xs"
+                                    color="gray"
+                                    onClick={handleLogoutClick}
+                                >
+                                    Logout
+                                </Button>
                             </Group>
                         </Group>
                     </AppShell.Header>
@@ -317,8 +325,11 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                             </Badge>
                         </Group>
 
-                        {/* ✅ ฝั่งขวา: เอาชื่อ + Logout ออก เหลือ Back อย่างเดียว */}
                         <Group gap="sm">
+                            <Text size="sm" c="dimmed">
+                                {displayName}
+                            </Text>
+
                             {onBack && (
                                 <Button
                                     variant="subtle"
@@ -329,6 +340,15 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                     Back
                                 </Button>
                             )}
+
+                            <Button
+                                variant="outline"
+                                size="xs"
+                                color="gray"
+                                onClick={handleLogoutClick}
+                            >
+                                Logout
+                            </Button>
                         </Group>
                     </Group>
                 </AppShell.Header>
@@ -336,6 +356,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                 <AppShell.Main>
                     <Container size="lg" py="md">
                         <Stack gap="md">
+
                             <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
                                 <Stack gap="sm">
                                     {/* Filter + Actions */}

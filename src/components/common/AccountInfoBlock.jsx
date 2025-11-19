@@ -1,7 +1,33 @@
 // src/components/common/AccountInfoBlock.jsx
-import { Badge, Button, Card, Divider, Group, Stack, Text } from "@mantine/core";
+import { Box, Button, Card, Divider, Group, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { IconUser } from "@tabler/icons-react";
+
+/**
+ * ชิปแบบ Gradient สำหรับแสดง DEPT / POSITION / ROLE
+ */
+function GradientChip({ children, from, to }) {
+    return (
+        <Box
+            px={10}
+            py={4}
+            style={{
+                fontSize: 10,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: 0.35,
+                borderRadius: 999,
+                background: `linear-gradient(135deg, ${from}, ${to})`,
+                color: "#0f172a",
+                boxShadow: "0 4px 10px rgba(15, 23, 42, 0.08)",
+                border: "1px solid rgba(255,255,255,0.8)",
+                whiteSpace: "nowrap",
+            }}
+        >
+            {children}
+        </Box>
+    );
+}
 
 /**
  * การ์ดต้อนรับ + ข้อมูลบัญชีที่ล็อกอินอยู่
@@ -9,9 +35,9 @@ import { IconUser } from "@tabler/icons-react";
  */
 export default function AccountInfoBlock({
     user,
-    onOpenProfile, // ถ้าจะ override behavior เอง (ส่วนใหญ่ไม่จำเป็นแล้ว)
+    onOpenProfile, // ถ้าจะ override behavior เอง
     onLogout,
-    description, // ถ้าไม่ส่งมา จะใช้ข้อความ default ของ Portal Center
+    description,
 }) {
     const displayName =
         user?.display_name ||
@@ -26,7 +52,6 @@ export default function AccountInfoBlock({
 
     // ---------- Profile Modal ----------
     const openProfileModal = () => {
-        // ถ้าอยากให้บางหน้าพาไป view=profile แบบเต็ม ก็ยังใช้ onOpenProfile override ได้
         if (typeof onOpenProfile === "function") {
             onOpenProfile();
             return;
@@ -51,21 +76,22 @@ export default function AccountInfoBlock({
 
                     <Divider my="xs" />
 
+                    {/* แสดงชิป DEPT / POSITION / ROLE แบบเดียวกับ header */}
                     <Group gap={8}>
                         {user?.department && (
-                            <Badge variant="light" color="teal" size="xs">
+                            <GradientChip from="#bbf7d0" to="#a5f3fc">
                                 DEPT: {user.department}
-                            </Badge>
+                            </GradientChip>
                         )}
                         {user?.position && (
-                            <Badge variant="light" color="blue" size="xs">
+                            <GradientChip from="#bfdbfe" to="#c4b5fd">
                                 POSITION: {user.position}
-                            </Badge>
+                            </GradientChip>
                         )}
                         {user?.role && (
-                            <Badge variant="light" color="violet" size="xs">
+                            <GradientChip from="#e9d5ff" to="#fecdd3">
                                 ROLE: {user.role}
-                            </Badge>
+                            </GradientChip>
                         )}
                     </Group>
 
@@ -108,38 +134,50 @@ export default function AccountInfoBlock({
     };
 
     return (
-        <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-            <Group justify="space-between" align="flex-start">
-                {/* ฝั่งซ้าย: ทักทาย + คำอธิบาย + Badge */}
-                <Stack gap={4} style={{ maxWidth: "70%" }}>
-                    <Text fw={600} size="sm">
-                        สวัสดีคุณ {displayName || "-"}
+        <Card
+            withBorder
+            radius={24}
+            style={{
+                background: "linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%)",
+                border: "1px solid rgba(148, 163, 184, 0.25)",
+                boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
+                padding: 18,
+            }}
+        >
+            <Group justify="space-between" align="center">
+                {/* ฝั่งซ้าย: ทักทาย + Badge แถวบน + Description แถวล่าง */}
+                <Stack gap={6} style={{ maxWidth: "70%" }}>
+                    {/* บรรทัด Welcome */}
+                    <Text fw={600} size="sm" style={{ letterSpacing: "-0.01em" }}>
+                        Welcome back, {displayName || "-"} 👋
                     </Text>
 
-                    <Text size="xs" c="dimmed">
-                        {descText}
-                    </Text>
-
-                    <Group gap={8} mt={4}>
+                    {/* แถวชิป DEPT / POSITION / ROLE (แบบในภาพ) */}
+                    <Group gap={8}>
                         {user?.department && (
-                            <Badge variant="light" color="teal" size="xs">
+                            <GradientChip from="#bbf7d0" to="#a5f3fc">
                                 DEPT: {user.department}
-                            </Badge>
+                            </GradientChip>
                         )}
                         {user?.position && (
-                            <Badge variant="light" color="blue" size="xs">
+                            <GradientChip from="#bfdbfe" to="#c4b5fd">
                                 POSITION: {user.position}
-                            </Badge>
+                            </GradientChip>
                         )}
                         {user?.role && (
-                            <Badge variant="light" color="violet" size="xs">
+                            <GradientChip from="#e9d5ff" to="#fecdd3">
                                 ROLE: {user.role}
-                            </Badge>
+                            </GradientChip>
                         )}
                     </Group>
+
+                    {/* คำอธิบายยาวด้านล่าง */}
+                    <Text size="xs" c="dimmed" mt={2}>
+                        {descText}
+                    </Text>
                 </Stack>
 
-                {/* ฝั่งขวา: เข้าสู่ระบบด้วยบัญชี + ปุ่ม */}
+                {/* ฝั่งขวา: ข้อมูล email + ปุ่มโปรไฟล์ / logout */}
                 <Stack gap={4} align="flex-end">
                     <Text size="xs" c="dimmed">
                         เข้าสู่ระบบด้วยบัญชี:
@@ -155,12 +193,12 @@ export default function AccountInfoBlock({
                             leftSection={<IconUser size={14} />}
                             onClick={openProfileModal}
                         >
-                            ดูโปรไฟล์
+                            Profile
                         </Button>
                         <Button
                             variant="outline"
                             size="xs"
-                            color="gray"
+                            color="red"
                             onClick={openLogoutConfirm}
                         >
                             Logout

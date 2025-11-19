@@ -1,4 +1,6 @@
 // src/components/auth/LoginScreen.jsx
+import { httpPlain } from "@/helpers/http";
+import { setAccessToken } from "@/helpers/tokenStorage";
 import {
     Box,
     Button,
@@ -15,15 +17,11 @@ import {
     Title,
 } from "@mantine/core";
 import { useEffect, useState } from "react";
-import { httpPlain } from "../../helpers/http";
-import {
-    setAccessToken,
-    setRefreshToken,
-} from "../../helpers/tokenStorage";
 
 // เวอร์ชันของแอป (กำหนดใน .env: VITE_APP_VERSION=1.0.0)
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || "v0.1.0";
 
+// log ไว้ดูเฉย ๆ (baseURL อยู่ใน http.js แล้ว)
 console.log("[YTRC Portal Center] APP_VERSION =", APP_VERSION);
 
 export default function LoginScreen({ onSuccess }) {
@@ -61,11 +59,10 @@ export default function LoginScreen({ onSuccess }) {
         setError("");
 
         try {
-            // ตาม BE ตอนนี้ใช้ OAuth2PasswordRequestForm → ต้องเป็น x-www-form-urlencoded
             const body = new URLSearchParams();
             body.append("username", identifier.trim());
             body.append("password", password);
-            body.append("grant_type", "password");
+            body.append("grant_type", "password"); // OAuth2PasswordRequestForm
 
             console.log("[login] POST /auth/login");
 
@@ -73,22 +70,15 @@ export default function LoginScreen({ onSuccess }) {
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                // ปล่อยให้ axios ส่ง body ตรง ๆ
-                transformRequest: [(data) => data],
             });
 
             const data = res.data;
             console.log("[login] success:", data);
 
-            const { access_token, refresh_token, user } = data || {};
-
-            if (!access_token || !refresh_token || !user) {
-                throw new Error("Invalid login payload from server");
+            const token = data.access_token || data.token;
+            if (token) {
+                setAccessToken(token);
             }
-
-            // เก็บ token ลง localStorage
-            setAccessToken(access_token);
-            setRefreshToken(refresh_token);
 
             // remember-me (จำเฉพาะ identifier)
             try {
@@ -98,22 +88,25 @@ export default function LoginScreen({ onSuccess }) {
                         JSON.stringify({
                             identifier: identifier.trim(),
                             remember: true,
-                        }),
+                        })
                     );
                 } else {
                     localStorage.removeItem("ytrc_portal_login");
                 }
-            } catch (e) {
-                console.warn("Failed to store remember-me info", e);
+            } catch (e2) {
+                console.warn("Failed to store remember-me info", e2);
             }
 
-            // ส่ง user object ให้ App
             if (typeof onSuccess === "function") {
-                onSuccess({ user });
+                onSuccess(data);
             }
         } catch (err) {
             console.error("[login error]", err);
-            setError(err.message || "ไม่สามารถเข้าสู่ระบบได้");
+            const msg =
+                err.response?.data?.detail ||
+                err.message ||
+                "ไม่สามารถเข้าสู่ระบบได้";
+            setError(msg);
         } finally {
             setSubmitting(false);
         }
