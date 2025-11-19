@@ -1,90 +1,191 @@
 // src/components/window/TitleBar.jsx
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useState } from "react";
+import { window as tauriWindow } from "@tauri-apps/api";
+import { useEffect, useMemo, useState } from "react";
 
 export default function TitleBar() {
-    const win = getCurrentWindow();
-    const [isMax, setIsMax] = useState(false);
+    const [isMaximized, setIsMaximized] = useState(false);
+
+    // อยู่ใน Tauri ไหม
+    const isTauri =
+        typeof window !== "undefined" && "__TAURI_IPC__" in window;
+
+    // window ปัจจุบัน (ถ้ามี Tauri)
+    const win = useMemo(
+        () => (isTauri ? tauriWindow.getCurrent() : null),
+        [isTauri]
+    );
 
     useEffect(() => {
-        win.isMaximized().then(setIsMax);
-    }, []);
+        if (!win) return;
 
-    const minimize = () => win.minimize();
-    const toggleMax = async () => {
-        const max = await win.isMaximized();
-        max ? win.unmaximize() : win.maximize();
-        setIsMax(!max);
+        (async () => {
+            try {
+                const max = await win.isMaximized();
+                setIsMaximized(max);
+            } catch (err) {
+                console.warn("[TitleBar] isMaximized error:", err);
+            }
+        })();
+    }, [win]);
+
+    const handleMinimize = async () => {
+        if (win) {
+            try {
+                await win.minimize();
+            } catch (err) {
+                console.error("[TitleBar] minimize error:", err);
+            }
+        } else {
+            console.log("[TitleBar] minimize (no tauri)");
+        }
     };
-    const close = () => win.close(); // ปิดได้จริง 100%
+
+    const handleMaximizeToggle = async () => {
+        if (win) {
+            try {
+                const max = await win.isMaximized();
+                if (max) {
+                    await win.unmaximize();
+                    setIsMaximized(false);
+                } else {
+                    await win.maximize();
+                    setIsMaximized(true);
+                }
+            } catch (err) {
+                console.error("[TitleBar] maximize toggle error:", err);
+            }
+        } else {
+            console.log("[TitleBar] maximize (no tauri)");
+        }
+    };
+
+    const handleClose = async () => {
+        if (win) {
+            try {
+                await win.close();
+            } catch (err) {
+                console.error("[TitleBar] close error:", err);
+            }
+        } else {
+            // ใช้ตอนรันใน browser เฉย ๆ
+            console.log("[TitleBar] close (no tauri)");
+            window.close?.();
+        }
+    };
 
     return (
         <div
-            data-tauri-drag-region
+            data-tauri-drag-region={isTauri ? "" : undefined}
             style={{
-                height: 42,
-                padding: "0 12px",
-                background: "#f3f4f6",
-                borderBottom: "1px solid #e5e7eb",
+                WebkitAppRegion: isTauri ? "drag" : "auto",
+                height: 40,
+                padding: "0 16px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                WebkitUserSelect: "none",
+                backgroundColor: "#f9fafb",
+                borderBottom: "1px solid rgba(226, 232, 240, 1)",
+                fontSize: 12,
+                color: "#111827",
+                userSelect: "none",
+                boxSizing: "border-box",
             }}
         >
-            {/* ---- Left empty (no mac buttons) ---- */}
-            <div style={{ width: 120 }} />
-
-            {/* ---- Title ---- */}
+            {/* ซ้าย: ชื่อแอป */}
             <div
                 style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "#111827",
-                    userSelect: "none",
-                    pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    minWidth: 0,
                 }}
             >
-                YTRC Portal Center
+                <span
+                    style={{
+                        fontWeight: 600,
+                        fontSize: 13,
+                    }}
+                >
+                    YTRC Portal Center
+                </span>
+
+                <span
+                    style={{
+                        fontSize: 11,
+                        color: "#6b7280",
+                        marginLeft: 6,
+                    }}
+                >
+                    · Internal systems hub
+                </span>
             </div>
 
-            {/* ---- Windows-style buttons ---- */}
-            <div style={{ display: "flex", WebkitAppRegion: "no-drag" }}>
-                <WinButton onClick={minimize}>—</WinButton>
-
-                <WinButton onClick={toggleMax}>{isMax ? "❐" : "□"}</WinButton>
-
-                <WinButton variant="danger" onClick={close}>✕</WinButton>
+            {/* ขวา: ปุ่ม window controls */}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    WebkitAppRegion: "no-drag",
+                }}
+            >
+                <TitleBarButton
+                    label="Minimize"
+                    onClick={handleMinimize}
+                    icon="▁"
+                />
+                <TitleBarButton
+                    label={isMaximized ? "Restore" : "Maximize"}
+                    onClick={handleMaximizeToggle}
+                    icon={isMaximized ? "🗗" : "🗖"}
+                />
+                <TitleBarButton
+                    label="Close"
+                    onClick={handleClose}
+                    variant="danger"
+                    icon="✕"
+                />
             </div>
         </div>
     );
 }
 
-function WinButton({ children, onClick, variant }) {
+function TitleBarButton({ label, onClick, icon, variant = "normal" }) {
+    const baseStyle = {
+        width: 30,
+        height: 22,
+        borderRadius: 6,
+        border: "1px solid rgba(209, 213, 219, 0.8)",
+        backgroundColor: "rgba(249, 250, 251, 0.9)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 11,
+        cursor: "pointer",
+        padding: 0,
+        outline: "none",
+    };
+
+    const dangerStyle =
+        variant === "danger"
+            ? {
+                borderColor: "rgba(248, 113, 113, 0.9)",
+                backgroundColor: "rgba(248, 113, 113, 0.1)",
+                color: "#b91c1c",
+            }
+            : {};
+
     return (
         <button
+            type="button"
             onClick={onClick}
+            title={label}
             style={{
-                width: 46,
-                height: 32,
-                border: "none",
-                background: "transparent",
-                fontSize: 14,
-                cursor: "pointer",
-                color: variant === "danger" ? "#b91c1c" : "#111827",
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.background =
-                    variant === "danger" ? "#ef4444" : "#e5e7eb";
-                e.currentTarget.style.color = variant === "danger" ? "#fff" : "#111827";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color =
-                    variant === "danger" ? "#b91c1c" : "#111827";
+                ...baseStyle,
+                ...dangerStyle,
             }}
         >
-            {children}
+            <span>{icon}</span>
         </button>
     );
 }

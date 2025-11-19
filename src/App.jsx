@@ -1,51 +1,50 @@
 // src/App.jsx
 import { useState } from "react";
 import LoginScreen from "./components/auth/LoginScreen";
-import PortalCenterPage from "./components/portal/PortalCenterPage"; // ถ้ามี
+import PortalCenterPage from "./components/portal/PortalCenterPage";
 import TitleBar from "./components/window/TitleBar";
 
 export default function App() {
   const [auth, setAuth] = useState(null);
 
   const handleLoginSuccess = (data) => {
-    setAuth(data); // data.user, data.access_token ฯลฯ
+    setAuth(data);
   };
 
   const handleLogout = () => {
     setAuth(null);
   };
 
+  const content = !auth ? (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <LoginScreen onSuccess={handleLoginSuccess} />
+    </div>
+  ) : (
+    <div style={{ flex: 1, minHeight: 0 }}>
+      <PortalCenterPage auth={auth} onLogout={handleLogout} />
+    </div>
+  );
+
   return (
     <div
       style={{
-        width: "100vw",
+        width: "100%",
         height: "100vh",
         display: "flex",
         flexDirection: "column",
+        backgroundColor: "#f3f4f6",
         overflow: "hidden",
       }}
     >
-      {/* TitleBar ด้านบน */}
       <TitleBar />
-
-      {/* เนื้อหาใต้ TitleBar */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: "#f3f4f6",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {!auth ? (
-          // หน้า Login (อยู่กลางจอ)
-          <LoginScreen onSuccess={handleLoginSuccess} />
-        ) : (
-          // หน้า Portal หลัก
-          <PortalCenterPage auth={auth} onLogout={handleLogout} />
-        )}
-      </div>
+      {content}
     </div>
   );
 }
