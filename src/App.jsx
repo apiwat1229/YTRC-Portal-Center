@@ -8,6 +8,7 @@ import {
   useLocation,
 } from "react-router-dom";
 
+import PermissionsPanel from "./components/admin/PermissionsPanel";
 import SystemMenuPortalPage from "./components/admin/SystemMenuPortalPage";
 import UsersPage from "./components/admin/users/UsersPage";
 import LoginScreen from "./components/auth/LoginScreen";
@@ -134,6 +135,11 @@ export default function App() {
                 />
               </RequireAuth>
             }
+          />
+
+          <Route
+            path="/system/permissions"
+            element={<PermissionsPanel auth={auth} />}
           />
 
           {/* Error 500 (เอาไว้โยน error กลาง ๆ มาแสดง) */}

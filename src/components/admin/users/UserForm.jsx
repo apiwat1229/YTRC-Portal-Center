@@ -1,22 +1,51 @@
 // src/components/admin/users/UserForm.jsx
-import { Button, Group, Select, Stack, Text, TextInput } from "@mantine/core";
+import {
+    Button,
+    Group,
+    PasswordInput,
+    Select,
+    Stack,
+    Text,
+    TextInput,
+} from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { IconCheck, IconX } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiRequest } from "./userApi";
 
-// ใช้ enum ให้ตรงกับฝั่ง FastAPI
-const ROLE_OPTIONS = [
+/* ======= enums/choices ======= */
+const roleOptions = [
     { value: "super_admin", label: "Super Admin" },
     { value: "admin", label: "Admin" },
-    { value: "user", label: "Staff" }, // map Staff -> user
+    { value: "manager", label: "Manager" },
+    { value: "editor", label: "Editor" },
+    { value: "support", label: "Support" },
+    { value: "member", label: "Member" },
     { value: "viewer", label: "Viewer" },
+    { value: "guest", label: "Guest" },
+    { value: "user", label: "User" },
 ];
 
-const STATUS_OPTIONS = [
+const statusOptions = [
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
     { value: "suspended", label: "Suspended" },
+];
+
+const departmentOptions = [
+    { value: "QA", label: "QA" },
+    { value: "QC", label: "QC" },
+    { value: "IT", label: "IT" },
+    { value: "HR", label: "HR" },
+    { value: "ACC", label: "Accounting" },
+    { value: "SALE", label: "Sales" },
+];
+
+const positionOptions = [
+    { value: "Manager", label: "Manager" },
+    { value: "Supervisor", label: "Supervisor" },
+    { value: "Officer", label: "Officer" },
+    { value: "Staff", label: "Staff" },
 ];
 
 export default function UserForm({
@@ -29,36 +58,34 @@ export default function UserForm({
 }) {
     const isEdit = mode === "edit";
 
-    // รองรับ id หลายแบบ เผื่อ backend เปลี่ยนชื่อ field
-    const userId = initial?.id || initial?._id || initial?.user_id || null;
+    const [form, setForm] = useState(() => {
+        const role =
+            (initial?.role ? String(initial.role).toLowerCase() : "user") || "user";
+        const status =
+            (initial?.status ? String(initial.status).toLowerCase() : "active") ||
+            "active";
 
-    const buildInitialForm = (initialUser) => ({
-        email: initialUser?.email || "",
-        username: initialUser?.username || "",
-        first_name: initialUser?.first_name || "",
-        last_name: initialUser?.last_name || "",
-        display_name: initialUser?.display_name || "",
-        department: initialUser?.department || "",
-        position: initialUser?.position || "",
-        // ⚠️ default เป็นค่า enum ตัวเล็กให้ตรง backend
-        role: initialUser?.role || "user",
-        status: initialUser?.status || "active",
-        permissions: Array.isArray(initialUser?.permissions)
-            ? initialUser.permissions.join(", ")
-            : "",
-        is_superuser: Boolean(initialUser?.is_superuser),
-        hod_user_id: initialUser?.hod_user_id || "",
-        password: "", // create: required, edit: optional
+        return {
+            email: initial?.email || "",
+            username: initial?.username || "",
+            first_name: initial?.first_name || "",
+            last_name: initial?.last_name || "",
+            display_name: initial?.display_name || "",
+            department: initial?.department || "",
+            position: initial?.position || "",
+            role,
+            status,
+            permissions: Array.isArray(initial?.permissions)
+                ? initial.permissions.join(", ")
+                : "",
+            is_superuser: Boolean(initial?.is_superuser),
+            hod_user_id: initial?.hod_user_id || "",
+            password: "", // create: required, edit: optional
+            confirm_password: "",
+        };
     });
 
-    const [form, setForm] = useState(() => buildInitialForm(initial));
     const [error, setError] = useState(null);
-
-    useEffect(() => {
-        if (isEdit && initial) {
-            setForm(buildInitialForm(initial));
-        }
-    }, [isEdit, initial]);
 
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -72,12 +99,35 @@ export default function UserForm({
             setError("กรุณากรอกอีเมล");
             return;
         }
-        if (mode === "create" && !form.password) {
-            setError("กรุณากำหนดรหัสผ่านสำหรับผู้ใช้ใหม่");
-            return;
+
+        // validate password & confirm
+        if (mode === "create") {
+            if (!form.password) {
+                setError("กรุณากำหนดรหัสผ่านสำหรับผู้ใช้ใหม่");
+                return;
+            }
+            if (form.password !== form.confirm_password) {
+                setError("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
+                return;
+            }
+        } else {
+            // edit mode: ถ้ากรอกอย่างใดอย่างหนึ่ง ต้องให้ตรงกันทั้งคู่
+            const hasPassword = !!form.password;
+            const hasConfirm = !!form.confirm_password;
+            if (hasPassword || hasConfirm) {
+                if (!hasPassword || !hasConfirm) {
+                    setError("กรุณากรอกทั้งรหัสผ่านใหม่และยืนยันรหัสผ่าน");
+                    return;
+                }
+                if (form.password !== form.confirm_password) {
+                    setError("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
+                    return;
+                }
+            }
         }
-        if (form.password && form.password.length < 6) {
-            setError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร");
+
+        if (!form.role) {
+            setError("กรุณาเลือก Role");
             return;
         }
 
@@ -89,8 +139,7 @@ export default function UserForm({
             display_name: form.display_name || null,
             department: form.department || null,
             position: form.position || null,
-            // #### ตรงนี้ส่ง enum ตัวเล็กไปตรง ๆ ####
-            role: form.role,
+            role: form.role, // ตัวเล็กตาม enum
             status: form.status,
             is_superuser: form.is_superuser,
             hod_user_id: form.hod_user_id || null,
@@ -111,7 +160,6 @@ export default function UserForm({
             let result;
 
             if (mode === "create") {
-                console.log("[UserForm] CREATE payload:", payload);
                 result = await apiRequest(
                     "/users/",
                     {
@@ -127,18 +175,8 @@ export default function UserForm({
                     icon: <IconCheck size={16} />,
                 });
             } else {
-                if (!userId) {
-                    const msg = "ไม่พบ ID ของผู้ใช้งาน (userId is missing)";
-                    setError(msg);
-                    showNotification({
-                        title: "บันทึกข้อมูลไม่สำเร็จ",
-                        message: msg,
-                        color: "red",
-                        icon: <IconX size={16} />,
-                    });
-                    setLoadingAction(false);
-                    return;
-                }
+                const userId =
+                    initial?.id || initial?._id || initial?.user_id || initial?.userId;
 
                 console.log("[UserForm] UPDATE userId:", userId);
                 console.log("[UserForm] UPDATE payload:", payload);
@@ -164,10 +202,17 @@ export default function UserForm({
             }
         } catch (err) {
             console.error("[UserForm] submit error:", err);
-            setError(err.message || "ไม่สามารถบันทึกข้อมูลผู้ใช้ได้");
+            const msg =
+                typeof err.message === "string"
+                    ? err.message
+                    : Array.isArray(err)
+                        ? JSON.stringify(err)
+                        : "ไม่สามารถบันทึกข้อมูลผู้ใช้ได้";
+
+            setError(msg);
             showNotification({
                 title: "บันทึกข้อมูลไม่สำเร็จ",
-                message: err.message || "",
+                message: msg,
                 color: "red",
                 icon: <IconX size={16} />,
             });
@@ -185,6 +230,7 @@ export default function UserForm({
                         required
                         value={form.email}
                         onChange={(e) => handleChange("email", e.currentTarget.value)}
+                        description="ใช้เฉพาะอีเมล"
                     />
                     <TextInput
                         label="Username"
@@ -207,7 +253,9 @@ export default function UserForm({
                     <TextInput
                         label="สกุล"
                         value={form.last_name}
-                        onChange={(e) => handleChange("last_name", e.currentTarget.value)}
+                        onChange={(e) =>
+                            handleChange("last_name", e.currentTarget.value)
+                        }
                     />
                 </Group>
 
@@ -221,44 +269,41 @@ export default function UserForm({
                 />
 
                 <Group grow wrap="wrap">
-                    <TextInput
+                    <Select
                         label="Department"
+                        placeholder="เลือกแผนก"
+                        data={departmentOptions}
                         value={form.department}
-                        onChange={(e) =>
-                            handleChange("department", e.currentTarget.value)
-                        }
+                        onChange={(v) => handleChange("department", v || "")}
+                        clearable
                     />
-                    <TextInput
+                    <Select
                         label="Position"
+                        placeholder="ตำแหน่ง"
+                        data={positionOptions}
                         value={form.position}
-                        onChange={(e) => handleChange("position", e.currentTarget.value)}
+                        onChange={(v) => handleChange("position", v || "")}
+                        clearable
                     />
                 </Group>
 
                 <Group grow wrap="wrap">
                     <Select
-                        label="Role"
-                        data={ROLE_OPTIONS}
+                        label="Role *"
+                        placeholder="เลือก Role"
+                        data={roleOptions}
                         value={form.role}
-                        onChange={(v) => handleChange("role", v)}
+                        onChange={(v) => handleChange("role", v || "user")}
                         required
                     />
                     <Select
                         label="Status"
-                        data={STATUS_OPTIONS}
+                        placeholder="สถานะ"
+                        data={statusOptions}
                         value={form.status}
-                        onChange={(v) => handleChange("status", v)}
+                        onChange={(v) => handleChange("status", v || "active")}
                     />
                 </Group>
-
-                <TextInput
-                    label="Permissions (comma separated)"
-                    value={form.permissions}
-                    onChange={(e) =>
-                        handleChange("permissions", e.currentTarget.value)
-                    }
-                    placeholder="เช่น portal.app.qr.view, portal.admin.users.manage"
-                />
 
                 <TextInput
                     label="HOD User ID (optional)"
@@ -268,18 +313,34 @@ export default function UserForm({
                     }
                 />
 
-                <TextInput
-                    label={isEdit ? "Password (เปลี่ยนรหัสผ่านใหม่)" : "Password"}
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => handleChange("password", e.currentTarget.value)}
-                    required={!isEdit}
-                    description={
-                        isEdit
-                            ? "ถ้าไม่ต้องการเปลี่ยนรหัสผ่าน ให้เว้นว่าง"
-                            : "รหัสผ่านเริ่มต้นสำหรับผู้ใช้ใหม่"
-                    }
-                />
+                <Group grow wrap="wrap">
+                    <PasswordInput
+                        label={isEdit ? "Password (เปลี่ยนรหัสผ่านใหม่)" : "Password"}
+                        value={form.password}
+                        onChange={(e) =>
+                            handleChange("password", e.currentTarget.value)
+                        }
+                        required={!isEdit}
+                        description={
+                            isEdit
+                                ? "ถ้าไม่ต้องการเปลี่ยนรหัสผ่าน ให้เว้นว่าง"
+                                : ""
+                        }
+                    />
+                    <PasswordInput
+                        label={isEdit ? "ยืนยันรหัสผ่านใหม่" : "Confirm password"}
+                        value={form.confirm_password}
+                        onChange={(e) =>
+                            handleChange("confirm_password", e.currentTarget.value)
+                        }
+                        required={!isEdit}
+                        description={
+                            isEdit
+                                ? "ถ้าไม่ต้องการเปลี่ยนรหัสผ่าน ให้เว้นว่าง"
+                                : ""
+                        }
+                    />
+                </Group>
 
                 {error && (
                     <Text size="xs" c="red">

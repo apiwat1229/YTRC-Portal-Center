@@ -5,17 +5,59 @@ import {
     Center,
     Group,
     Loader,
-    ScrollArea,
-    Stack,
     Table,
     Text,
+    Tooltip,
 } from "@mantine/core";
-import {
-    IconCheck,
-    IconCircleX,
-    IconEdit,
-    IconTrash,
-} from "@tabler/icons-react";
+import { IconPencil, IconTrash } from "@tabler/icons-react";
+
+/* ---------- แผนที่ Role -> label + สี ---------- */
+const ROLE_META = {
+    super_admin: { label: "Super Admin", color: "grape" },
+    admin: { label: "Admin", color: "blue" },
+    manager: { label: "Manager", color: "teal" },
+    editor: { label: "Editor", color: "cyan" },
+    support: { label: "Support", color: "violet" },
+    member: { label: "Member", color: "indigo" },
+    viewer: { label: "Viewer", color: "gray" },
+    guest: { label: "Guest", color: "gray" },
+    user: { label: "User", color: "dark" },
+};
+
+/* ---------- แผนที่ Status -> label + สี ---------- */
+const STATUS_META = {
+    active: { label: "Active", color: "green" },
+    inactive: { label: "Inactive", color: "gray" },
+    suspended: { label: "Suspended", color: "red" },
+};
+
+// helper ให้ได้ id ที่แน่นอน
+const getUserId = (u) => u?.id || u?._id || u?.user_id || u?.userId || null;
+
+function RoleBadge({ value }) {
+    const key = value ? String(value).toLowerCase() : "user";
+    const meta = ROLE_META[key] || { label: value || "User", color: "dark" };
+
+    return (
+        <Badge size="xs" radius="lg" color={meta.color} variant="light">
+            {meta.label}
+        </Badge>
+    );
+}
+
+function StatusBadge({ value }) {
+    const key = value ? String(value).toLowerCase() : "inactive";
+    const meta = STATUS_META[key] || {
+        label: value || "Unknown",
+        color: "gray",
+    };
+
+    return (
+        <Badge size="xs" radius="lg" color={meta.color} variant="light">
+            {meta.label}
+        </Badge>
+    );
+}
 
 export default function UsersTable({
     users,
@@ -24,136 +66,109 @@ export default function UsersTable({
     onEdit,
     onDelete,
 }) {
-    return (
-        <ScrollArea h={420}>
-            {loading ? (
-                <Center py="lg">
-                    <Loader size="sm" />
-                </Center>
-            ) : users.length === 0 ? (
-                <Center py="lg">
-                    <Text size="sm" c="dimmed">
-                        ไม่พบผู้ใช้งานตามเงื่อนไขที่ค้นหา
+    if (loading) {
+        return (
+            <Center py="lg">
+                <Loader size="sm" />
+            </Center>
+        );
+    }
+
+    if (!users || users.length === 0) {
+        return (
+            <Center py="lg">
+                <Text size="sm" c="dimmed">
+                    ไม่พบผู้ใช้งานในระบบ
+                </Text>
+            </Center>
+        );
+    }
+
+    const rows = users.map((u) => {
+        const id = getUserId(u);
+        const fullName =
+            [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+            u.display_name ||
+            u.username ||
+            u.email;
+
+        return (
+            <Table.Tr key={id || u.email}>
+                <Table.Td>
+                    <Text size="sm" fw={500}>
+                        {fullName}
                     </Text>
-                </Center>
-            ) : (
-                <Table striped highlightOnHover withTableBorder>
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th>ชื่อ - สกุล</Table.Th>
-                            <Table.Th>อีเมล / Username</Table.Th>
-                            <Table.Th>แผนก / ตำแหน่ง</Table.Th>
-                            <Table.Th>Role</Table.Th>
-                            <Table.Th>สถานะ</Table.Th>
-                            <Table.Th w={110} ta="right">
-                                Actions
-                            </Table.Th>
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {users.map((u, index) => (
-                            <Table.Tr
-                                key={u.id || u.email || u.username || index}  // ✅ มี fallback
-                            >
-                                <Table.Td>
-                                    <Stack gap={0}>
-                                        <Text size="sm" fw={500}>
-                                            {u.display_name ||
-                                                [u.first_name, u.last_name].filter(Boolean).join(" ") ||
-                                                "-"}
-                                        </Text>
-                                        <Text size="xs" c="dimmed">
-                                            {u.id}
-                                        </Text>
-                                    </Stack>
-                                </Table.Td>
+                    <Text size="xs" c="dimmed">
+                        {u.email}
+                    </Text>
+                </Table.Td>
 
-                                <Table.Td>
-                                    <Stack gap={0}>
-                                        <Text size="sm">{u.email}</Text>
-                                        <Text size="xs" c="dimmed">
-                                            {u.username ? `@${u.username}` : "-"}
-                                        </Text>
-                                    </Stack>
-                                </Table.Td>
+                <Table.Td>
+                    <Text size="xs">{u.department || "-"}</Text>
+                </Table.Td>
 
-                                <Table.Td>
-                                    <Stack gap={0}>
-                                        <Text size="sm">{u.department || <span>-</span>}</Text>
-                                        <Text size="xs" c="dimmed">
-                                            {u.position || ""}
-                                        </Text>
-                                    </Stack>
-                                </Table.Td>
+                <Table.Td>
+                    <Text size="xs">{u.position || "-"}</Text>
+                </Table.Td>
 
-                                <Table.Td>
-                                    <Badge
-                                        size="xs"
-                                        radius="lg"
-                                        color={
-                                            u.role === "SUPER_ADMIN"
-                                                ? "red"
-                                                : u.role === "ADMIN"
-                                                    ? "indigo"
-                                                    : u.role === "STAFF"
-                                                        ? "teal"
-                                                        : "gray"
-                                        }
-                                    >
-                                        {u.role || "N/A"}
-                                    </Badge>
-                                </Table.Td>
+                <Table.Td>
+                    <RoleBadge value={u.role} />
+                </Table.Td>
 
-                                <Table.Td>
-                                    <Badge
-                                        size="xs"
-                                        radius="lg"
-                                        leftSection={
-                                            u.status === "ACTIVE" ? (
-                                                <IconCheck size={12} />
-                                            ) : (
-                                                <IconCircleX size={12} />
-                                            )
-                                        }
-                                        color={
-                                            u.status === "ACTIVE"
-                                                ? "green"
-                                                : u.status === "SUSPENDED"
-                                                    ? "orange"
-                                                    : "gray"
-                                        }
-                                    >
-                                        {u.status || "UNKNOWN"}
-                                    </Badge>
-                                </Table.Td>
+                <Table.Td>
+                    <StatusBadge value={u.status} />
+                </Table.Td>
 
-                                <Table.Td>
-                                    <Group gap={6} justify="flex-end" wrap="nowrap">
-                                        <ActionIcon
-                                            size="sm"
-                                            variant="subtle"
-                                            color="blue"
-                                            disabled={!canManageUsers}
-                                            onClick={() => onEdit?.(u)}
-                                        >
-                                            <IconEdit size={16} />
-                                        </ActionIcon>
-                                        <ActionIcon
-                                            size="sm"
-                                            variant="subtle"
-                                            color="red"
-                                            disabled={!canManageUsers}
-                                            onClick={() => onDelete?.(u)}
-                                        >
-                                            <IconTrash size={16} />
-                                        </ActionIcon>
-                                    </Group>
-                                </Table.Td>
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
-            )}
-        </ScrollArea>
+                {canManageUsers && (
+                    <Table.Td width={90}>
+                        <Group gap={4} justify="flex-end">
+                            <Tooltip label="แก้ไขผู้ใช้งาน" openDelay={300}>
+                                <ActionIcon
+                                    size="sm"
+                                    variant="subtle"
+                                    color="blue"
+                                    onClick={() => onEdit && onEdit(u)}
+                                >
+                                    <IconPencil size={14} />
+                                </ActionIcon>
+                            </Tooltip>
+
+                            <Tooltip label="ลบผู้ใช้งาน" openDelay={300}>
+                                <ActionIcon
+                                    size="sm"
+                                    variant="subtle"
+                                    color="red"
+                                    onClick={() => onDelete && onDelete(u)}
+                                >
+                                    <IconTrash size={14} />
+                                </ActionIcon>
+                            </Tooltip>
+                        </Group>
+                    </Table.Td>
+                )}
+            </Table.Tr>
+        );
+    });
+
+    return (
+        <Table
+            striped
+            highlightOnHover
+            withRowBorders={false}
+            verticalSpacing="xs"
+            horizontalSpacing="md"
+        >
+            <Table.Thead>
+                <Table.Tr>
+                    <Table.Th>ชื่อ - สกุล / อีเมล</Table.Th>
+                    <Table.Th>Department</Table.Th>
+                    <Table.Th>Position</Table.Th>
+                    <Table.Th>Role</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    {canManageUsers && <Table.Th style={{ width: 90 }}>Actions</Table.Th>}
+                </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>{rows}</Table.Tbody>
+        </Table>
     );
 }

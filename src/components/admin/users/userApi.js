@@ -1,100 +1,84 @@
 // src/components/admin/users/userApi.js
+import { http } from "@/helpers/http";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
-
-// ดึง token จาก auth (รองรับทั้ง access_token / token)
+// ดึง token จาก auth (จะไม่ใช้แล้ว แต่อยู่เพื่อไม่ให้พังโค้ดเดิม)
 export function getAccessToken(auth) {
     return auth?.access_token || auth?.token || null;
 }
 
+/**
+ * apiRequest แบบ generic รองรับ method เดิม:
+ *   apiRequest("/users/", { method: "POST", body: JSON.stringify(payload) }, auth)
+ */
 export async function apiRequest(path, options = {}, auth) {
-    const url = `${API_BASE}${path}`;
+    const method = (options.method || "GET").toUpperCase();
 
-    const token = getAccessToken(auth);
     const headers = {
-        "Content-Type": "application/json",
         ...(options.headers || {}),
     };
 
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
-    }
-
-    console.log("[userApi] fetch →", url, { ...options, headers });
-
-    let res;
-    try {
-        res = await fetch(url, {
-            ...options,
-            headers,
-        });
-    } catch (networkErr) {
-        console.error("[userApi] network error (fetch failed):", networkErr);
-        const err = new Error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
-        err.cause = networkErr;
-        throw err;
-    }
-
-    // -------- อ่าน response body ให้ละเอียด (text → json) --------
-    let rawText = "";
-    let data = null;
-
-    try {
-        rawText = await res.text();
-        if (rawText) {
+    // แปลง body ของ fetch → data ของ axios
+    let dataToSend = undefined;
+    if (options.body !== undefined) {
+        if (typeof options.body === "string") {
             try {
-                data = JSON.parse(rawText);
-            } catch (parseErr) {
-                // ไม่ใช่ JSON ก็เก็บเป็น string ตรงๆ
-                data = rawText;
+                dataToSend = JSON.parse(options.body);
+            } catch {
+                dataToSend = options.body;
             }
+        } else {
+            dataToSend = options.body;
         }
-    } catch (readErr) {
-        console.error("[userApi] error reading response body:", readErr);
     }
 
-    if (!res.ok) {
-        console.error("[userApi] HTTP error:", res.status, data);
+    const config = {
+        url: path,
+        method,
+        headers,
+        data: dataToSend,
+        params: options.params,
+    };
 
-        let msg = `HTTP ${res.status}`;
+    console.log("[userApi] axios →", config);
 
-        if (data) {
-            // กรณี FastAPI แบบมาตรฐาน: {"detail": "..."}
-            if (typeof data === "string") {
-                msg = data;
-            } else if (data.detail) {
-                if (typeof data.detail === "string") {
-                    msg = data.detail;
-                } else {
-                    // detail เป็น object/list
-                    msg = JSON.stringify(data.detail);
-                }
-            }
-            // กรณี Pydantic validation error: [{"loc": ..., "msg": "...", ...}, ...]
-            else if (Array.isArray(data) && data.length > 0) {
-                const first = data[0];
-                if (typeof first === "string") {
-                    msg = first;
-                } else if (first.msg) {
-                    msg = first.msg;
+    try {
+        const res = await http.request(config);
+        return res.data ?? null;
+    } catch (error) {
+        console.error("[userApi] HTTP error:", error);
+
+        const res = error.response;
+        const data = res?.data;
+
+        let msg = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้";
+
+        if (res) {
+            msg = `HTTP ${res.status}`;
+            if (data) {
+                if (typeof data === "string") {
+                    msg = data;
+                } else if (data.detail) {
+                    if (typeof data.detail === "string") {
+                        msg = data.detail;
+                    } else {
+                        msg = JSON.stringify(data.detail);
+                    }
+                } else if (Array.isArray(data) && data.length > 0) {
+                    const first = data[0];
+                    if (typeof first === "string") msg = first;
+                    else if (first.msg) msg = first.msg;
+                    else msg = JSON.stringify(data);
                 } else {
                     msg = JSON.stringify(data);
                 }
-            } else {
-                msg = JSON.stringify(data);
             }
+        } else if (error.message) {
+            msg = error.message;
         }
 
         const err = new Error(msg);
-        err.status = res.status;
+        err.status = res?.status;
         err.data = data;
         throw err;
     }
-
-    // ไม่มี body (เช่น 204)
-    if (!rawText) {
-        return null;
-    }
-
-    return data;
 }

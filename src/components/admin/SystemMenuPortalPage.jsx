@@ -22,15 +22,14 @@ import {
     IconUsers,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ เพิ่มตรงนี้
+import { useNavigate } from "react-router-dom";
 import { can } from "../auth/permission";
 
 export default function SystemMenuPortalPage({ auth, onBack }) {
     const { user } = auth || {};
     const [activeTool, setActiveTool] = useState(null); // 'users' | 'permissions' | 'menus' | 'roles' | null
-    const navigate = useNavigate(); // ✅ ใช้ navigate ได้แล้ว
+    const navigate = useNavigate();
 
-    // สิทธิ์ย่อยใน System Menu (ให้ can จัดการ superuser ให้แล้ว)
     const canUsers = can(user, "portal.admin.users.view");
     const canPermissions = can(user, "portal.admin.permissions.manage");
     const canMenus = can(user, "portal.admin.menus.manage");
@@ -42,12 +41,9 @@ export default function SystemMenuPortalPage({ auth, onBack }) {
                 padding="md"
                 header={{ height: 64 }}
                 styles={{
-                    main: {
-                        backgroundColor: "transparent", // ให้เห็น gradient จาก .app-bg
-                    },
+                    main: { backgroundColor: "transparent" },
                 }}
             >
-                {/* Header ด้านบน */}
                 <AppShell.Header>
                     <Group
                         h="100%"
@@ -76,7 +72,6 @@ export default function SystemMenuPortalPage({ auth, onBack }) {
                     </Group>
                 </AppShell.Header>
 
-                {/* เนื้อหาหลัก */}
                 <AppShell.Main>
                     <Container size="lg" py="md">
                         <Stack gap="md">
@@ -93,7 +88,7 @@ export default function SystemMenuPortalPage({ auth, onBack }) {
                                         onClick={() => {
                                             if (!canUsers) return;
                                             setActiveTool("users");
-                                            navigate("/system/users"); // ✅ ไปหน้า Users
+                                            navigate("/system/users");
                                             console.log("[System Menu] go to User management");
                                         }}
                                     />
@@ -109,6 +104,7 @@ export default function SystemMenuPortalPage({ auth, onBack }) {
                                         onClick={() => {
                                             if (!canPermissions) return;
                                             setActiveTool("permissions");
+                                            navigate("/system/permissions"); // ✅ ไปหน้า PermissionsPanel
                                             console.log("[System Menu] go to Permission Manager");
                                         }}
                                     />
@@ -176,7 +172,6 @@ export default function SystemMenuPortalPage({ auth, onBack }) {
     );
 }
 
-// การ์ดของ System Menu
 function SystemAppCard({
     title,
     description,

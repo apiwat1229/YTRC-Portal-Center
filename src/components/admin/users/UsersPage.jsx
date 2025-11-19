@@ -27,7 +27,6 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { can, isSuperuser } from "../../auth/permission";
-import AccountInfoBlock from "../../common/AccountInfoBlock";
 import { apiRequest } from "./userApi";
 import UserForm from "./UserForm";
 import UsersTable from "./UsersTable";
@@ -44,6 +43,9 @@ const STATUS_FILTER_OPTIONS = [
     { value: "inactive", label: "Inactive" },
     { value: "suspended", label: "Suspended" },
 ];
+
+// ✅ helper ใช้ทุกที่ที่ต้องดึง userId
+const getUserId = (u) => u?.id || u?._id || u?.user_id || u?.userId || null;
 
 export default function UsersPage({ auth, onLogout, onBack }) {
     const { user } = auth || {};
@@ -146,7 +148,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                     onSubmitSuccess={(saved) => {
                         setUsers((prev) => {
                             if (isEdit) {
-                                return prev.map((u) => (u.id === saved.id ? saved : u));
+                                return prev.map((u) =>
+                                    getUserId(u) === getUserId(saved) ? saved : u
+                                );
                             }
                             return [saved, ...prev];
                         });
@@ -161,6 +165,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
 
     const handleDeleteUser = (u) => {
         if (!canManageUsers) return;
+
+        const userId = getUserId(u);
+
         modals.openConfirmModal({
             title: "ลบผู้ใช้งาน",
             centered: true,
@@ -176,10 +183,28 @@ export default function UsersPage({ auth, onLogout, onBack }) {
             labels: { confirm: "ลบผู้ใช้", cancel: "ยกเลิก" },
             confirmProps: { color: "red" },
             onConfirm: async () => {
+                if (!userId) {
+                    const msg = "ไม่พบ ID ของผู้ใช้งาน (u.id เป็น undefined)";
+                    console.error("[UsersPage] delete: missing userId", u);
+                    showNotification({
+                        title: "ลบผู้ใช้งานไม่สำเร็จ",
+                        message: msg,
+                        color: "red",
+                        icon: <IconX size={16} />,
+                    });
+                    return;
+                }
+
                 try {
                     setLoadingAction(true);
-                    await apiRequest(`/users/${u.id}`, { method: "DELETE" }, auth);
-                    setUsers((prev) => prev.filter((x) => x.id !== u.id));
+                    console.log("[UsersPage] DELETE userId:", userId);
+
+                    await apiRequest(`/users/${userId}`, { method: "DELETE" }, auth);
+
+                    setUsers((prev) =>
+                        prev.filter((x) => getUserId(x) !== userId)
+                    );
+
                     showNotification({
                         title: "ลบผู้ใช้งานสำเร็จ",
                         message: "ผู้ใช้งานถูกลบออกจากระบบแล้ว",
@@ -228,6 +253,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                 </Badge>
                             </Group>
 
+                            {/* ✅ ฝั่งขวา: เหลือแค่ปุ่ม Back */}
                             <Group gap="sm">
                                 {onBack && (
                                     <Button
@@ -239,14 +265,6 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                         Back
                                     </Button>
                                 )}
-                                <Button
-                                    variant="outline"
-                                    size="xs"
-                                    color="gray"
-                                    onClick={handleLogoutClick}
-                                >
-                                    Logout
-                                </Button>
                             </Group>
                         </Group>
                     </AppShell.Header>
@@ -299,11 +317,8 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                             </Badge>
                         </Group>
 
+                        {/* ✅ ฝั่งขวา: เอาชื่อ + Logout ออก เหลือ Back อย่างเดียว */}
                         <Group gap="sm">
-                            <Text size="sm" c="dimmed">
-                                {displayName}
-                            </Text>
-
                             {onBack && (
                                 <Button
                                     variant="subtle"
@@ -314,15 +329,6 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                     Back
                                 </Button>
                             )}
-
-                            <Button
-                                variant="outline"
-                                size="xs"
-                                color="gray"
-                                onClick={handleLogoutClick}
-                            >
-                                Logout
-                            </Button>
                         </Group>
                     </Group>
                 </AppShell.Header>
@@ -330,12 +336,6 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                 <AppShell.Main>
                     <Container size="lg" py="md">
                         <Stack gap="md">
-                            <AccountInfoBlock
-                                user={user}
-                                onLogout={onLogout}
-                                description="จัดการผู้ใช้งานภายในระบบ YTRC Portal Center: สิทธิ์เข้าใช้งาน, Role, Department, และสถานะบัญชี"
-                            />
-
                             <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
                                 <Stack gap="sm">
                                     {/* Filter + Actions */}
@@ -397,6 +397,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
 
                                     <Divider my="xs" />
 
+                                    {/* ตาราง Users */}
                                     <Box
                                         style={{
                                             borderRadius: 8,
