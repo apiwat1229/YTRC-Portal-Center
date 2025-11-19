@@ -24,8 +24,14 @@ import {
 } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { can } from "../auth/permission";
+import AccountInfoBlock from "../common/AccountInfoBlock";
 
-export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
+export default function SystemMenuPortalPage({
+    auth,
+    onLogout,
+    onBack,
+    onOpenProfile, // ✅ เพิ่ม prop สำหรับปุ่มดูโปรไฟล์
+}) {
     const { user } = auth || {};
     const [activeTool, setActiveTool] = useState(null); // 'users' | 'permissions' | 'menus' | 'roles' | null
 
@@ -47,13 +53,6 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
         can(user, "portal.admin.menus.manage") || user?.is_superuser;
     const canRoles =
         can(user, "portal.admin.roles.manage") || user?.is_superuser;
-
-    const initials = (displayName || "?")
-        .split(" ")
-        .map((x) => x[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
 
     return (
         <AppShell
@@ -105,102 +104,34 @@ export default function SystemMenuPortalPage({ auth, onLogout, onBack }) {
         >
             <Container size="lg" py="md">
                 <Stack gap="md">
-                    {/* Header / User info card */}
-                    <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-                        {/* แถวบน: title + badge + คำอธิบาย */}
-                        <Group justify="space-between" align="flex-start" mb="sm">
-                            <Stack gap={4} style={{ flex: 1 }}>
-                                <Group gap="xs" align="center">
-                                    <Title order={4}>System Administration Center</Title>
-                                    <Badge size="xs" radius="lg" variant="light" color="blue">
-                                        ADMIN CENTER
-                                    </Badge>
-                                </Group>
-                                <Text size="xs" c="dimmed">
-                                    ศูนย์กลางสำหรับจัดการผู้ใช้งาน, สิทธิ์การเข้าถึง, เมนูระบบ และโครงสร้างบทบาท
-                                    (Roles) เพื่อควบคุมการเข้าถึงระบบย่อยทั้งหมดใน{" "}
-                                    <Text component="span" fw={500}>
-                                        YTRC Portal Center
-                                    </Text>
-                                </Text>
-                            </Stack>
-
-                            <Stack gap={6} align="flex-end">
-                                <Text size="xs" c="dimmed">
-                                    การจัดการระดับระบบ
-                                </Text>
-                                <Button
-                                    variant="light"
-                                    size="xs"
-                                    leftSection={<IconArrowLeft size={14} />}
-                                    onClick={onBack}
-                                >
-                                    Back to Portal
-                                </Button>
-                            </Stack>
-                        </Group>
-
-                        <Divider my="sm" />
-
-                        {/* แถวล่าง: Avatar + user info */}
-                        <Group align="center" gap="md">
-                            <Box
-                                style={{
-                                    width: 58,
-                                    height: 58,
-                                    borderRadius: "999px",
-                                    background: "linear-gradient(135deg, #3b82f6, #0ea5e9)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontWeight: 700,
-                                    fontSize: 20,
-                                    color: "white",
-                                }}
-                            >
-                                {initials}
-                            </Box>
-
-                            <Stack gap={4}>
-                                <Group gap={8} align="baseline">
-                                    <Text fw={600} size="sm">
-                                        {displayName || "-"}
-                                    </Text>
-                                    {user?.email && (
-                                        <Text size="xs" c="dimmed">
-                                            ({user.email})
-                                        </Text>
-                                    )}
-                                </Group>
-
-                                <Group gap={8} mt={2}>
-                                    {user?.department && (
-                                        <Badge variant="light" color="teal" size="xs">
-                                            DEPT: {user.department}
-                                        </Badge>
-                                    )}
-                                    {user?.position && (
-                                        <Badge variant="light" color="blue" size="xs">
-                                            POSITION: {user.position}
-                                        </Badge>
-                                    )}
-                                    {user?.role && (
-                                        <Badge variant="light" color="violet" size="xs">
-                                            ROLE: {user.role}
-                                        </Badge>
-                                    )}
-                                </Group>
-                            </Stack>
-                        </Group>
-                    </Card>
+                    {/* Header / User info (reuse AccountInfoBlock) */}
+                    <AccountInfoBlock
+                        user={user}
+                        onOpenProfile={onOpenProfile} // ✅ ส่ง handler ให้ปุ่ม ดูโปรไฟล์
+                        onLogout={onLogout}
+                        description={
+                            "คุณกำลังใช้งาน System Administration Center สำหรับจัดการผู้ใช้งาน, สิทธิ์การเข้าถึง, เมนูระบบ และโครงสร้างบทบาท (Roles) เพื่อควบคุมการเข้าถึงระบบย่อยทั้งหมดใน YTRC Portal Center"
+                        }
+                    />
 
                     {/* System applications cards */}
                     <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
                         <Group justify="space-between" mb="xs">
-                            <Text fw={600}>System applications</Text>
-                            <Text size="xs" c="dimmed">
-                                Back to system categories
-                            </Text>
+                            <Group gap="xs" align="center">
+                                <Title order={5}>System Applications</Title>
+                                <Badge size="xs" radius="lg" variant="light" color="blue">
+                                    ADMIN CENTER
+                                </Badge>
+                            </Group>
+
+                            <Button
+                                variant="subtle"
+                                size="xs"
+                                leftSection={<IconArrowLeft size={14} />}
+                                onClick={onBack}
+                            >
+                                Back to Portal
+                            </Button>
                         </Group>
 
                         <Text size="xs" c="dimmed" mb="sm">

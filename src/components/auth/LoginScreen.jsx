@@ -5,7 +5,7 @@ import {
     Center,
     Checkbox,
     Code,
-    Container,
+    Divider,
     Group,
     Paper,
     PasswordInput,
@@ -22,7 +22,11 @@ const API_BASE =
     import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:8110/api";
 
+// เวอร์ชันของแอป (กำหนดใน .env: VITE_APP_VERSION=1.0.0)
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || "v0.1.0";
+
 console.log("[YTRC Portal Center] API_BASE =", API_BASE);
+console.log("[YTRC Portal Center] APP_VERSION =", APP_VERSION);
 
 export default function LoginScreen({ onSuccess }) {
     const [identifier, setIdentifier] = useState("");
@@ -92,7 +96,10 @@ export default function LoginScreen({ onSuccess }) {
                 if (remember) {
                     localStorage.setItem(
                         "ytrc_portal_login",
-                        JSON.stringify({ identifier: identifier.trim(), remember: true }),
+                        JSON.stringify({
+                            identifier: identifier.trim(),
+                            remember: true,
+                        }),
                     );
                 } else {
                     localStorage.removeItem("ytrc_portal_login");
@@ -111,113 +118,184 @@ export default function LoginScreen({ onSuccess }) {
     };
 
     return (
+        // กล่องใหญ่สุด: พื้นหลังทั้งหน้า + จัดฟอร์มให้อยู่กลางจอ
         <Box
             style={{
-                minHeight: "100vh",
-                background: "linear-gradient(135deg, #eef2ff, #f5f5f5)",
+                width: "100vw",
+                height: "100vh",
+                backgroundColor: "#f3f4f6", // เทาอ่อนแบบในภาพ
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxSizing: "border-box",
             }}
         >
-            <Center style={{ minHeight: "100vh" }}>
-                <Container size={420} my={40}>
-                    <Title
-                        ta="center"
-                        style={{
-                            fontWeight: 600,
-                            fontFamily: "Outfit, system-ui, -apple-system, sans-serif",
-                        }}
-                    >
-                        Welcome back!
-                    </Title>
-
-                    <Text
-                        size="sm"
-                        c="dimmed"
-                        ta="center"
-                        mt={5}
-                        style={{ fontFamily: "Outfit, var(--mantine-font-family)" }}
-                    >
-                        Sign in to{" "}
-                        <Text component="span" fw={600}>
-                            YTRC Portal Center
-                        </Text>{" "}
-                        to access internal applications
-                    </Text>
-
-                    <Paper
-                        withBorder
-                        shadow="sm"
-                        p={22}
-                        mt={30}
-                        radius="md"
-                        style={{ backgroundColor: "white" }}
-                    >
-                        {error && (
-                            <Paper
-                                p="xs"
-                                radius="md"
-                                withBorder
-                                mb="sm"
+            {/* การ์ด Login */}
+            <Paper
+                withBorder
+                shadow="xl"
+                radius={24}
+                p={28}
+                style={{
+                    width: 420,
+                    maxWidth: "100vw",
+                    backgroundColor: "#ffffff",
+                }}
+            >
+                <Stack gap="md">
+                    {/* Avatar กลมด้านบน */}
+                    <Center>
+                        <Box
+                            style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: "999px",
+                                background:
+                                    "radial-gradient(circle at 30% 30%, #f4f4f5, #e5e7eb)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <Box
                                 style={{
-                                    borderColor: "#f97373",
-                                    backgroundColor: "rgba(248, 113, 113, 0.07)",
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: "999px",
+                                    border: "1px solid rgba(148, 163, 184, 0.6)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 22,
+                                    color: "#4b5563",
                                 }}
                             >
-                                <Text size="sm" c="red.7">
-                                    {error}
-                                </Text>
-                            </Paper>
-                        )}
+                                <span>👤</span>
+                            </Box>
+                        </Box>
+                    </Center>
 
-                        <form onSubmit={handleSubmit}>
-                            <Stack gap="sm">
-                                <TextInput
-                                    label="Email / Username"
-                                    placeholder="apiwat.s หรือ apiwat@ytrc.co.th"
-                                    required
-                                    radius="md"
-                                    value={identifier}
-                                    onChange={(e) => {
-                                        setIdentifier(e.target.value);
-                                        setError("");
-                                    }}
-                                    autoComplete="username"
-                                />
-                                <PasswordInput
-                                    label="Password"
-                                    placeholder="Your password"
-                                    required
-                                    mt="xs"
-                                    radius="md"
-                                    value={password}
-                                    onChange={(e) => {
-                                        setPassword(e.target.value);
-                                        setError("");
-                                    }}
-                                    autoComplete="current-password"
-                                />
-
-                                <Group justify="space-between" mt="lg">
-                                    <Checkbox
-                                        label="Remember me"
-                                        size="xs"
-                                        checked={remember}
-                                        onChange={(event) =>
-                                            setRemember(event.currentTarget.checked)
-                                        }
-                                    />
-                                    <Button type="submit" loading={submitting} radius="md">
-                                        {submitting ? "Signing in..." : "Sign in"}
-                                    </Button>
-                                </Group>
-                            </Stack>
-                        </form>
-
-                        <Text size="xs" c="dimmed" mt="md" ta="right">
-                            API: <Code fz={11}>{API_BASE}/auth/login</Code>
+                    {/* Title + Subtitle */}
+                    <Box style={{ textAlign: "center" }}>
+                        <Title
+                            order={3}
+                            style={{
+                                fontWeight: 600,
+                                fontFamily:
+                                    "Outfit, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                            }}
+                        >
+                            Login to your account
+                        </Title>
+                        <Text size="sm" c="dimmed" mt={4}>
+                            Enter your details to login.
                         </Text>
-                    </Paper>
-                </Container>
-            </Center>
+                    </Box>
+
+                    <Divider my="xs" />
+
+                    {/* Error message */}
+                    {error && (
+                        <Paper
+                            p="xs"
+                            radius="md"
+                            withBorder
+                            mb="xs"
+                            style={{
+                                borderColor: "#f97373",
+                                backgroundColor: "rgba(248, 113, 113, 0.07)",
+                            }}
+                        >
+                            <Text size="sm" c="red.7">
+                                {error}
+                            </Text>
+                        </Paper>
+                    )}
+
+                    {/* Form */}
+                    <form onSubmit={handleSubmit}>
+                        <Stack gap="sm">
+                            <TextInput
+                                label="Email Address"
+                                placeholder="you@example.com หรือ apiwat.s"
+                                required
+                                radius="md"
+                                value={identifier}
+                                onChange={(e) => {
+                                    setIdentifier(e.target.value);
+                                    setError("");
+                                }}
+                                autoComplete="username"
+                            />
+
+                            <PasswordInput
+                                label="Password"
+                                placeholder="Your password"
+                                required
+                                radius="md"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    setError("");
+                                }}
+                                autoComplete="current-password"
+                            />
+
+                            <Group justify="space-between" mt="xs">
+                                <Checkbox
+                                    label="Keep me logged in"
+                                    size="xs"
+                                    checked={remember}
+                                    onChange={(event) =>
+                                        setRemember(event.currentTarget.checked)
+                                    }
+                                />
+                                <Text
+                                    component="button"
+                                    type="button"
+                                    size="xs"
+                                    style={{
+                                        border: "none",
+                                        padding: 0,
+                                        background: "none",
+                                        color: "#4b5563",
+                                        textDecoration: "underline",
+                                        cursor: "pointer",
+                                    }}
+                                    onClick={() => {
+                                        console.log("[login] forgot password clicked");
+                                    }}
+                                >
+                                    Forgot password?
+                                </Text>
+                            </Group>
+
+                            {/* ปุ่มใช้สีเดิม (blue) */}
+                            <Button
+                                type="submit"
+                                mt="md"
+                                radius={999}
+                                fullWidth
+                                color="blue"
+                                loading={submitting}
+                            >
+                                {submitting ? "Signing in..." : "Login"}
+                            </Button>
+                        </Stack>
+                    </form>
+
+                    {/* Footer: แสดง Version ของแอป */}
+                    <Text
+                        size="xs"
+                        c="dimmed"
+                        mt="sm"
+                        ta="center"
+                        style={{ marginTop: 16 }}
+                    >
+                        Version: <Code fz={11}>{APP_VERSION}</Code>
+                    </Text>
+                </Stack>
+            </Paper>
         </Box>
     );
 }

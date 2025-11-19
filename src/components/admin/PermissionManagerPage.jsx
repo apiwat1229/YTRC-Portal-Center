@@ -17,8 +17,14 @@ import {
 import { IconGridDots, IconLock, IconUserShield } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { can } from "../auth/permission";
+import AccountInfoBlock from "../common/AccountInfoBlock";
 
-export default function PermissionManagerPage({ auth, onLogout, onBack }) {
+export default function PermissionManagerPage({
+    auth,
+    onLogout,
+    onBack,
+    onOpenProfile, // ✅ ถ้ามีจะถูกส่งต่อไปที่ AccountInfoBlock
+}) {
     const { user } = auth || {};
 
     const displayName = useMemo(() => {
@@ -34,7 +40,7 @@ export default function PermissionManagerPage({ auth, onLogout, onBack }) {
     const canManagePermissions =
         can(user, "portal.admin.permissions.manage") || user?.is_superuser;
 
-    // ถ้ายังไม่ได้ login หรือไม่มีสิทธิ์จัดการสิทธิ์
+    // ถ้ายังไม่ได้ login
     if (!user) {
         return (
             <Box
@@ -102,7 +108,19 @@ export default function PermissionManagerPage({ auth, onLogout, onBack }) {
                 {!canManagePermissions ? (
                     <NoAccessCard />
                 ) : (
-                    <PermissionContent user={user} />
+                    <Stack gap="md">
+                        {/* ✅ reuse AccountInfoBlock เหมือนหน้าอื่น ๆ */}
+                        <AccountInfoBlock
+                            user={user}
+                            onOpenProfile={onOpenProfile}
+                            onLogout={onLogout}
+                            description={
+                                "คุณกำลังใช้งาน Permissions & Access Control เพื่อกำหนดว่าสามารถเข้าถึงระบบย่อยใดได้บ้าง และจัดการสิทธิ์ของผู้ใช้งานใน YTRC Portal Center"
+                            }
+                        />
+
+                        <PermissionContent user={user} />
+                    </Stack>
                 )}
             </Container>
         </AppShell>
@@ -226,7 +244,10 @@ function PermissionContent({ user }) {
                                                 "portal.app.maintenance.view"
                                             )}
                                             onChange={() =>
-                                                handleToggle(row.id, "portal.app.maintenance.view")
+                                                handleToggle(
+                                                    row.id,
+                                                    "portal.app.maintenance.view"
+                                                )
                                             }
                                         />
                                     </Table.Td>
@@ -235,7 +256,9 @@ function PermissionContent({ user }) {
                                     <Table.Td>
                                         <Checkbox
                                             size="xs"
-                                            checked={row.permissions.has("portal.app.stock.view")}
+                                            checked={row.permissions.has(
+                                                "portal.app.stock.view"
+                                            )}
                                             onChange={() =>
                                                 handleToggle(row.id, "portal.app.stock.view")
                                             }

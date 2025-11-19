@@ -3,24 +3,32 @@
   "productName": "ytrc-portal-center",
   "version": "0.1.0",
   "identifier": "com.apiwat.ytrc-portal-center",
+
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
+
   "app": {
     "windows": [
       {
-        "title": "ytrc-portal-center",
-        "width": 800,
-        "height": 600
+        "title": "YTRC Portal Center",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false
       }
     ],
     "security": {
       "csp": null
     }
   },
+
   "bundle": {
     "active": true,
     "targets": "all",

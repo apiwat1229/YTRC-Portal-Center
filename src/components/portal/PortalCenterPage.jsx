@@ -1,4 +1,3 @@
-// src/components/portal/PortalCenterPage.jsx
 import {
     AppShell,
     Badge,
@@ -11,32 +10,36 @@ import {
     Group,
     SimpleGrid,
     Stack,
-    Text,
+    Text
 } from "@mantine/core";
+import { modals } from "@mantine/modals";
 import {
+    IconCalendarTime,
+    IconDropletHalf2,
     IconGridDots,
     IconLock,
     IconPackages,
     IconQrcode,
     IconSettings,
     IconTools,
+    IconTruck,
     IconUser,
-    IconUsersGroup,
+    IconUsersGroup
 } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { can } from "../auth/permission";
+import AccountInfoBlock from "../common/AccountInfoBlock";
 
 export default function PortalCenterPage({
     auth,
     onLogout,
-    onOpenProfile,
     onOpenPermissions,
     onOpenContactPortal,
     onOpenSystemPortal,
+    onOpenCuplumpPortal
 }) {
     const { user } = auth || {};
     const [activeApp, setActiveApp] = useState(null);
-    // 'qr' | 'maintenance' | 'stock' | 'contact' | 'system' | null
 
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -48,15 +51,83 @@ export default function PortalCenterPage({
         );
     }, [user]);
 
-    // ---------- สิทธิ์ของ user ----------
     const canQR = can(user, "portal.app.qr.view");
+    const canCuplump = can(user, "portal.app.cuplump.view");
+    const canBooking = can(user, "portal.app.booking.view");
+    const canTruckScale = can(user, "portal.app.truckscale.view");
     const canMaintenance = can(user, "portal.app.maintenance.view");
     const canStock = can(user, "portal.app.stock.view");
     const canContact = can(user, "portal.app.contact.view");
     const canSystemMenu = can(user, "portal.app.system_menu.view");
-
     const canManagePermissions =
         can(user, "portal.admin.permissions.manage") || user?.is_superuser;
+
+    const openProfileModal = () => {
+        const name = displayName || user?.username || user?.email || "";
+        modals.open({
+            title: "ข้อมูลบัญชีผู้ใช้งาน",
+            radius: "md",
+            size: "lg",
+            children: (
+                <Stack gap="sm">
+                    <Stack gap={2}>
+                        <Text fw={600} size="sm">
+                            {name || "-"}
+                        </Text>
+                        {user?.email && (
+                            <Text size="xs" c="dimmed">
+                                {user.email}
+                            </Text>
+                        )}
+                    </Stack>
+
+                    <Group gap={8}>
+                        {user?.department && (
+                            <Badge variant="light" color="teal" size="xs">
+                                DEPT: {user.department}
+                            </Badge>
+                        )}
+                        {user?.position && (
+                            <Badge variant="light" color="blue" size="xs">
+                                POSITION: {user.position}
+                            </Badge>
+                        )}
+                        {user?.role && (
+                            <Badge variant="light" color="violet" size="xs">
+                                ROLE: {user.role}
+                            </Badge>
+                        )}
+                    </Group>
+
+                    <Text size="xs" c="dimmed">
+                        บัญชีนี้ใช้สำหรับเข้าถึง Portal ต่าง ๆ ของ YTRC เช่น QR, Cuplump,
+                        Booking Queue, TruckScale, Contact Management และ System Menu
+                        ตามสิทธิ์ที่ได้รับ
+                    </Text>
+                </Stack>
+            )
+        });
+    };
+
+    const openLogoutConfirm = () => {
+        if (typeof onLogout !== "function") return;
+        modals.openConfirmModal({
+            title: "ออกจากระบบ",
+            centered: true,
+            children: (
+                <Text size="sm">
+                    คุณต้องการออกจากระบบ{" "}
+                    <Text component="span" fw={600}>
+                        YTRC Portal Center
+                    </Text>{" "}
+                    ใช่หรือไม่?
+                </Text>
+            ),
+            labels: { confirm: "ยืนยันออกจากระบบ", cancel: "ยกเลิก" },
+            confirmProps: { color: "red" },
+            onConfirm: () => onLogout()
+        });
+    };
 
     return (
         <AppShell
@@ -64,17 +135,18 @@ export default function PortalCenterPage({
             header={{ height: 64 }}
             styles={{
                 main: {
-                    backgroundColor: "#f5f7fb",
-                },
+                    backgroundColor: "#f5f7fb"
+                }
             }}
-            headerSection={
+        >
+            <AppShell.Header>
                 <Group
                     h="100%"
                     px="md"
                     justify="space-between"
                     style={{
                         borderBottom: "1px solid rgba(226, 232, 240, 1)",
-                        backgroundColor: "white",
+                        backgroundColor: "white"
                     }}
                 >
                     <Group gap="xs">
@@ -102,7 +174,7 @@ export default function PortalCenterPage({
                             variant="subtle"
                             size="xs"
                             leftSection={<IconUser size={14} />}
-                            onClick={onOpenProfile}
+                            onClick={openProfileModal}
                         >
                             Profile
                         </Button>
@@ -110,205 +182,179 @@ export default function PortalCenterPage({
                             variant="outline"
                             size="xs"
                             color="gray"
-                            onClick={onLogout}
+                            onClick={openLogoutConfirm}
                         >
                             Logout
                         </Button>
                     </Group>
                 </Group>
-            }
-        >
-            <Container size="lg" py="md">
-                <Stack gap="md">
-                    {/* การ์ดต้อนรับผู้ใช้งาน */}
-                    <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-                        <Group justify="space-between" align="center">
-                            <Stack gap={4}>
-                                <Text fw={600} size="sm">
-                                    สวัสดีคุณ {displayName || "-"}
-                                </Text>
+            </AppShell.Header>
+
+            <AppShell.Main>
+                <Container size="lg" py="md">
+                    <Stack gap="md">
+                        <AccountInfoBlock user={user} onLogout={onLogout} />
+
+                        <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
+                            <Group justify="space-between" mb="xs">
+                                <Text fw={600}>Applications</Text>
                                 <Text size="xs" c="dimmed">
-                                    คุณกำลังใช้งาน{" "}
-                                    <Text component="span" fw={500}>
-                                        YTRC Portal Center
-                                    </Text>{" "}
-                                    เพื่อเข้าถึงระบบภายใน เช่น QR Code, แจ้งซ่อม, ระบบ Stock,
-                                    Contact Management และ System Menu
+                                    Back to all categories
                                 </Text>
-                                <Group gap={8} mt={4}>
-                                    {user?.department && (
-                                        <Badge variant="light" color="teal" size="xs">
-                                            Dept: {user.department}
-                                        </Badge>
-                                    )}
-                                    {user?.position && (
-                                        <Badge variant="light" color="blue" size="xs">
-                                            Position: {user.position}
-                                        </Badge>
-                                    )}
-                                    {user?.role && (
-                                        <Badge variant="light" color="violet" size="xs">
-                                            Role: {user.role}
-                                        </Badge>
-                                    )}
-                                </Group>
-                            </Stack>
+                            </Group>
 
-                            <Stack gap="xs" align="flex-end">
-                                <Text size="xs" c="dimmed">
-                                    เข้าสู่ระบบด้วยบัญชี:
-                                </Text>
-                                <Text size="sm" fw={500}>
-                                    {user?.email || "-"}
-                                </Text>
-                                <Group gap="xs" mt={4}>
-                                    <Button
-                                        variant="subtle"
-                                        size="xs"
-                                        leftSection={<IconUser size={14} />}
-                                        onClick={onOpenProfile}
-                                    >
-                                        ดูโปรไฟล์
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="xs"
-                                        color="gray"
-                                        onClick={onLogout}
-                                    >
-                                        Logout
-                                    </Button>
-                                </Group>
-                            </Stack>
-                        </Group>
-                    </Card>
-
-                    {/* Application cards */}
-                    <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
-                        <Group justify="space-between" mb="xs">
-                            <Text fw={600}>Applications</Text>
-                            <Text size="xs" c="dimmed">
-                                Back to all categories
+                            <Text size="xs" c="dimmed" mb="sm">
+                                เลือกระบบย่อยที่ต้องการใช้งานจาก YTRC Portal Center
                             </Text>
-                        </Group>
 
-                        <Text size="xs" c="dimmed" mb="sm">
-                            เลือกระบบย่อยที่ต้องการใช้งานจาก YTRC Portal Center
-                        </Text>
+                            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg" mt="md">
+                                <AppCardBig
+                                    title="QR Code"
+                                    description="Queue, booking tickets, truck receive QR และ internal QR-based workflows."
+                                    color="cyan"
+                                    icon={IconQrcode}
+                                    active={activeApp === "qr"}
+                                    disabled={!canQR}
+                                    onClick={() => {
+                                        if (!canQR) return;
+                                        setActiveApp("qr");
+                                    }}
+                                />
 
-                        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg" mt="md">
-                            {/* QR Code */}
-                            <AppCardBig
-                                title="QR Code"
-                                description="Queue, booking tickets, truck receive QR and internal QR-based workflows."
-                                color="cyan"
-                                icon={IconQrcode}
-                                active={activeApp === "qr"}
-                                disabled={!canQR}
-                                onClick={() => {
-                                    if (!canQR) return;
-                                    setActiveApp("qr");
-                                    // TODO: ต่อหน้า QR Portal จริงในอนาคต
-                                }}
-                            />
+                                <AppCardBig
+                                    title="Cuplump Management"
+                                    description="บริหารจัดการยางก้อนถ้วย: รับซื้อ, Quality, Warehouse และ Reports."
+                                    color="teal"
+                                    icon={IconDropletHalf2}
+                                    active={activeApp === "cuplump"}
+                                    disabled={!canCuplump}
+                                    onClick={() => {
+                                        if (!canCuplump) return;
+                                        setActiveApp("cuplump");
+                                        onOpenCuplumpPortal && onOpenCuplumpPortal();
+                                    }}
+                                />
 
-                            {/* แจ้งซ่อม */}
-                            <AppCardBig
-                                title="แจ้งซ่อม"
-                                description="Maintenance requests, breakdown logging, CM/PM tracking for machines and equipment."
-                                color="orange"
-                                icon={IconTools}
-                                active={activeApp === "maintenance"}
-                                disabled={!canMaintenance}
-                                onClick={() => {
-                                    if (!canMaintenance) return;
-                                    setActiveApp("maintenance");
-                                    // TODO: ต่อหน้า Maintenance Portal
-                                }}
-                            />
+                                <AppCardBig
+                                    title="Booking Queue"
+                                    description="จัดการคิวการส่งของ / Truck booking สำหรับโรงงาน."
+                                    color="indigo"
+                                    icon={IconCalendarTime}
+                                    active={activeApp === "booking"}
+                                    disabled={!canBooking}
+                                    onClick={() => {
+                                        if (!canBooking) return;
+                                        setActiveApp("booking");
+                                    }}
+                                />
 
-                            {/* ระบบ Stock */}
-                            <AppCardBig
-                                title="ระบบ Stock"
-                                description="Inventory and warehouse management, stock levels, in-out transactions."
-                                color="green"
-                                icon={IconPackages}
-                                active={activeApp === "stock"}
-                                disabled={!canStock}
-                                onClick={() => {
-                                    if (!canStock) return;
-                                    setActiveApp("stock");
-                                    // TODO: ต่อหน้า Stock Portal
-                                }}
-                            />
+                                <AppCardBig
+                                    title="TruckScale"
+                                    description="จัดการชั่งน้ำหนักรถเข้า–ออก และโยงกับคิว / บิล."
+                                    color="grape"
+                                    icon={IconTruck}
+                                    active={activeApp === "truckscale"}
+                                    disabled={!canTruckScale}
+                                    onClick={() => {
+                                        if (!canTruckScale) return;
+                                        setActiveApp("truckscale");
+                                    }}
+                                />
 
-                            {/* Contact Management */}
-                            <AppCardBig
-                                title="Contact Management"
-                                description="จัดการข้อมูลบุคคล, บริษัท, แผนก, และช่องทางติดต่อที่เกี่ยวข้องกับ YTRC."
-                                color="indigo"
-                                icon={IconUsersGroup}
-                                active={activeApp === "contact"}
-                                disabled={!canContact}
-                                onClick={() => {
-                                    if (!canContact) return;
-                                    setActiveApp("contact");
-                                    onOpenContactPortal && onOpenContactPortal();
-                                }}
-                            />
+                                <AppCardBig
+                                    title="แจ้งซ่อม"
+                                    description="Maintenance requests, breakdown logging, CM/PM tracking สำหรับเครื่องจักรและอุปกรณ์."
+                                    color="orange"
+                                    icon={IconTools}
+                                    active={activeApp === "maintenance"}
+                                    disabled={!canMaintenance}
+                                    onClick={() => {
+                                        if (!canMaintenance) return;
+                                        setActiveApp("maintenance");
+                                    }}
+                                />
 
-                            {/* System Menu */}
-                            <AppCardBig
-                                title="System Menu"
-                                description="ศูนย์กลางการตั้งค่าระบบ: ผู้ใช้, สิทธิ์, เมนู และโครงสร้างระบบหลัก."
-                                color="red"
-                                icon={IconSettings}
-                                active={activeApp === "system"}
-                                disabled={!canSystemMenu}
-                                onClick={() => {
-                                    if (!canSystemMenu) return;
-                                    setActiveApp("system");
-                                    onOpenSystemPortal && onOpenSystemPortal();
-                                }}
-                            />
-                        </SimpleGrid>
+                                <AppCardBig
+                                    title="ระบบ Stock"
+                                    description="Inventory และ warehouse management, stock levels, in-out transactions."
+                                    color="green"
+                                    icon={IconPackages}
+                                    active={activeApp === "stock"}
+                                    disabled={!canStock}
+                                    onClick={() => {
+                                        if (!canStock) return;
+                                        setActiveApp("stock");
+                                    }}
+                                />
 
-                        <Divider my="md" />
+                                <AppCardBig
+                                    title="Contact Management"
+                                    description="จัดการข้อมูลบุคคล, บริษัท, แผนก และช่องทางติดต่อที่เกี่ยวข้องกับ YTRC."
+                                    color="indigo"
+                                    icon={IconUsersGroup}
+                                    active={activeApp === "contact"}
+                                    disabled={!canContact}
+                                    onClick={() => {
+                                        if (!canContact) return;
+                                        setActiveApp("contact");
+                                        onOpenContactPortal && onOpenContactPortal();
+                                    }}
+                                />
 
-                        <Box>
-                            <Text size="xs" c="dimmed" mb={4}>
-                                Selected app:
+                                <AppCardBig
+                                    title="System Menu"
+                                    description="ศูนย์กลางการตั้งค่าระบบ: ผู้ใช้, สิทธิ์, เมนู และโครงสร้างระบบหลัก."
+                                    color="red"
+                                    icon={IconSettings}
+                                    active={activeApp === "system"}
+                                    disabled={!canSystemMenu}
+                                    onClick={() => {
+                                        if (!canSystemMenu) return;
+                                        setActiveApp("system");
+                                        onOpenSystemPortal && onOpenSystemPortal();
+                                    }}
+                                />
+                            </SimpleGrid>
+
+                            <Divider my="md" />
+
+                            <Box>
+                                <Text size="xs" c="dimmed" mb={4}>
+                                    Selected app:
+                                </Text>
+                                <Code fz={12}>
+                                    {activeApp === "qr" &&
+                                        "QR Code — ระบบคิว / บัตรคิว / Ticket / Truck QR"}
+                                    {activeApp === "cuplump" &&
+                                        "Cuplump Management — บริหารจัดการยางก้อนถ้วยแบบครบวงจร"}
+                                    {activeApp === "booking" &&
+                                        "Booking Queue — จัดการคิวรถเข้า–ออกโรงงาน"}
+                                    {activeApp === "truckscale" &&
+                                        "TruckScale — ระบบชั่งน้ำหนักรถ และโยงกับเอกสาร/คิว"}
+                                    {activeApp === "maintenance" &&
+                                        "แจ้งซ่อม — ระบบ Maintenance Request / CM / PM"}
+                                    {activeApp === "stock" &&
+                                        "ระบบ Stock — Inventory / Warehouse / การเบิก-รับสินค้า"}
+                                    {activeApp === "contact" &&
+                                        "Contact Management — ระบบจัดการข้อมูลบุคคล บริษัท และ Contact ที่เกี่ยวข้อง"}
+                                    {activeApp === "system" &&
+                                        "System Menu — ศูนย์กลางการตั้งค่าระบบ เช่น User, Permissions, Menu, Roles"}
+                                    {!activeApp &&
+                                        "ยังไม่ได้เลือกแอปย่อย (คลิกที่การ์ดด้านบนเพื่อเริ่มใช้งาน)"}
+                                </Code>
+                            </Box>
+
+                            <Text size="xs" c="dimmed" mt="xs">
+                                * บางแอปอาจถูกปิดการใช้งานขึ้นกับสิทธิ์การเข้าถึงของบัญชีผู้ใช้
                             </Text>
-                            <Code fz={12}>
-                                {activeApp === "qr" &&
-                                    "QR Code — ระบบคิว / บัตรคิว / Ticket / Truck QR"}
-                                {activeApp === "maintenance" &&
-                                    "แจ้งซ่อม — ระบบ Maintenance Request / CM / PM"}
-                                {activeApp === "stock" &&
-                                    "ระบบ Stock — Inventory / Warehouse / การเบิก-รับสินค้า"}
-                                {activeApp === "contact" &&
-                                    "Contact Management — ระบบจัดการข้อมูลบุคคล บริษัท และ Contact ที่เกี่ยวข้อง"}
-                                {activeApp === "system" &&
-                                    "System Menu — ศูนย์กลางการตั้งค่าระบบ เช่น User, Permissions, Menu, Roles"}
-                                {!activeApp &&
-                                    "ยังไม่ได้เลือกแอปย่อย (คลิกที่การ์ดด้านบนเพื่อเริ่มใช้งาน)"}
-                            </Code>
-                        </Box>
-
-                        <Text size="xs" c="dimmed" mt="xs">
-                            * บางแอปอาจถูกปิดการใช้งานขึ้นกับสิทธิ์การเข้าถึงของบัญชีผู้ใช้
-                        </Text>
-                    </Card>
-                </Stack>
-            </Container>
+                        </Card>
+                    </Stack>
+                </Container>
+            </AppShell.Main>
         </AppShell>
     );
 }
 
-/**
- * การ์ดแอปแบบใหญ่ (inspired by ActionsGrid แต่ใหญ่กว่า)
- * - ถ้า disabled = true จะจางลง, cursor เป็น not-allowed และไม่เรียก onClick
- */
 function AppCardBig({
     title,
     description,
@@ -316,7 +362,7 @@ function AppCardBig({
     icon: Icon,
     active,
     disabled,
-    onClick,
+    onClick
 }) {
     const isActive = active && !disabled;
 
@@ -342,7 +388,7 @@ function AppCardBig({
                         : "rgba(226,232,240,1)",
                 opacity: disabled ? 0.6 : 1,
                 transition:
-                    "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease",
+                    "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease"
             }}
             shadow={isActive ? "md" : "xs"}
         >
@@ -355,7 +401,7 @@ function AppCardBig({
                         backgroundColor: `var(--mantine-color-${color}-0, #eff6ff)`,
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
+                        justifyContent: "center"
                     }}
                 >
                     <Icon size={24} color={`var(--mantine-color-${color}-6, #2563eb)`} />

@@ -1,7 +1,24 @@
-# Tauri + React
+เรียก Notification ได้จาก 
 
-This template should help get you started developing with Tauri and React in Vite.
+import { notifications } from "@mantine/notifications";
 
-## Recommended IDE Setup
+notifications.show({
+title: "Saved",
+message: "บันทึกข้อมูลเรียบร้อยแล้ว",
+color: "teal",
+});
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+
+เรียก Modal manager ได้จาก
+
+
+import { modals } from "@mantine/modals";
+
+modals.openConfirmModal({
+  title: "ยืนยันการลบ",
+  children: "คุณต้องการลบรายการนี้ใช่หรือไม่?",
+  labels: { confirm: "ยืนยัน", cancel: "ยกเลิก" },
+  confirmProps: { color: "red" },
+  onConfirm: () => { /* ทำ action ลบ */ },
+});

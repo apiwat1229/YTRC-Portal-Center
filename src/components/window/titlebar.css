@@ -1,0 +1,29 @@
+.titlebar {
+  height: 36px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  user-select: none;
+}
+
+.titlebar .title {
+  font-size: 14px;
+  color: #394b59;
+}
+
+.titlebar .controls button {
+  width: 36px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.titlebar .controls .close:hover {
+  background: #ff4d4d;
+  color: white;
+}
