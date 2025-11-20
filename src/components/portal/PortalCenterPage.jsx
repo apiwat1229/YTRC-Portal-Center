@@ -359,7 +359,7 @@ export default function PortalCenterPage({
 
                                 <Card
                                     padding="xs"
-                                    radius="md"
+                                    radius={12}
                                     withBorder
                                     shadow="sm"
                                     bg="white"
@@ -459,8 +459,8 @@ export default function PortalCenterPage({
                                     spacing="lg"
                                 >
                                     <AppWidget
-                                        title="QR Code"
-                                        category="MRP Operations"
+                                        title="QR System"
+                                        category="Gate Operations"
                                         icon={IconQrcode}
                                         color="cyan"
                                         status="Online"
@@ -486,7 +486,7 @@ export default function PortalCenterPage({
                                     />
 
                                     <AppWidget
-                                        title="Booking"
+                                        title="Booking Queue"
                                         category="Logistics"
                                         icon={IconCalendarTime}
                                         color="indigo"
@@ -498,7 +498,7 @@ export default function PortalCenterPage({
                                     />
 
                                     <AppWidget
-                                        title="TruckScale"
+                                        title="Weight Scale"
                                         category="Weighing"
                                         icon={IconTruck}
                                         color="grape"
@@ -550,7 +550,7 @@ export default function PortalCenterPage({
                                     />
 
                                     <AppWidget
-                                        title="System Config"
+                                        title="System Settings"
                                         category="Admin"
                                         icon={IconSettings}
                                         color="red"

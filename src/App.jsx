@@ -9,7 +9,7 @@ import {
 } from "react-router-dom";
 
 import PermissionsPanel from "./components/admin/PermissionsPanel";
-import SystemMenuPortalPage from "./components/admin/SystemMenuPortalPage";
+import SystemMenuPortalPage from "./components/system/SystemMenuPortalPage";
 import UsersPage from "./components/admin/users/UsersPage";
 import LoginScreen from "./components/auth/LoginScreen";
 import Error404Page from "./components/error/Error404Page";

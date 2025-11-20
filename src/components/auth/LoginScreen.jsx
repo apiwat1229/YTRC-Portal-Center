@@ -1,6 +1,4 @@
 // src/components/auth/LoginScreen.jsx
-import { httpPlain } from "@/helpers/http";
-import { setAccessToken } from "@/helpers/tokenStorage";
 import {
     Box,
     Button,
@@ -18,10 +16,16 @@ import {
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 
+// โหลดจาก .env (Vite)
+const API_BASE =
+    import.meta.env.VITE_TAURI_API_BASE_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8110/api";
+
 // เวอร์ชันของแอป (กำหนดใน .env: VITE_APP_VERSION=1.0.0)
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || "v0.1.0";
 
-// log ไว้ดูเฉย ๆ (baseURL อยู่ใน http.js แล้ว)
+console.log("[YTRC Portal Center] API_BASE =", API_BASE);
 console.log("[YTRC Portal Center] APP_VERSION =", APP_VERSION);
 
 export default function LoginScreen({ onSuccess }) {
@@ -62,23 +66,30 @@ export default function LoginScreen({ onSuccess }) {
             const body = new URLSearchParams();
             body.append("username", identifier.trim());
             body.append("password", password);
-            body.append("grant_type", "password"); // OAuth2PasswordRequestForm
+            body.append("grant_type", "password"); // สำหรับ OAuth2PasswordRequestForm
 
-            console.log("[login] POST /auth/login");
+            const url = `${API_BASE}/auth/login`;
+            console.log("[login] POST", url);
 
-            const res = await httpPlain.post("/auth/login", body, {
+            const res = await fetch(url, {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
+                body: body.toString(),
             });
 
-            const data = res.data;
-            console.log("[login] success:", data);
-
-            const token = data.access_token || data.token;
-            if (token) {
-                setAccessToken(token);
+            if (!res.ok) {
+                let detail = `Login failed (${res.status})`;
+                try {
+                    const errJson = await res.json();
+                    if (errJson?.detail) detail = errJson.detail;
+                } catch (_) { }
+                throw new Error(detail);
             }
+
+            const data = await res.json();
+            console.log("[login] success:", data);
 
             // remember-me (จำเฉพาะ identifier)
             try {
@@ -88,42 +99,38 @@ export default function LoginScreen({ onSuccess }) {
                         JSON.stringify({
                             identifier: identifier.trim(),
                             remember: true,
-                        })
+                        }),
                     );
                 } else {
                     localStorage.removeItem("ytrc_portal_login");
                 }
-            } catch (e2) {
-                console.warn("Failed to store remember-me info", e2);
+            } catch (e) {
+                console.warn("Failed to store remember-me info", e);
             }
 
-            if (typeof onSuccess === "function") {
-                onSuccess(data);
-            }
+            onSuccess(data);
         } catch (err) {
             console.error("[login error]", err);
-            const msg =
-                err.response?.data?.detail ||
-                err.message ||
-                "ไม่สามารถเข้าสู่ระบบได้";
-            setError(msg);
+            setError(err.message || "ไม่สามารถเข้าสู่ระบบได้");
         } finally {
             setSubmitting(false);
         }
     };
 
     return (
+        // กล่องใหญ่สุด: พื้นหลังทั้งหน้า + จัดฟอร์มให้อยู่กลางจอ
         <Box
             style={{
                 width: "100vw",
                 height: "100vh",
-                backgroundColor: "#f3f4f6",
+                backgroundColor: "#f3f4f6", // เทาอ่อนแบบในภาพ
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 boxSizing: "border-box",
             }}
         >
+            {/* การ์ด Login */}
             <Paper
                 withBorder
                 shadow="xl"
@@ -136,6 +143,7 @@ export default function LoginScreen({ onSuccess }) {
                 }}
             >
                 <Stack gap="md">
+                    {/* Avatar กลมด้านบน */}
                     <Center>
                         <Box
                             style={{
@@ -167,6 +175,7 @@ export default function LoginScreen({ onSuccess }) {
                         </Box>
                     </Center>
 
+                    {/* Title + Subtitle */}
                     <Box style={{ textAlign: "center" }}>
                         <Title
                             order={3}
@@ -185,6 +194,7 @@ export default function LoginScreen({ onSuccess }) {
 
                     <Divider my="xs" />
 
+                    {/* Error message */}
                     {error && (
                         <Paper
                             p="xs"
@@ -202,6 +212,7 @@ export default function LoginScreen({ onSuccess }) {
                         </Paper>
                     )}
 
+                    {/* Form */}
                     <form onSubmit={handleSubmit}>
                         <Stack gap="sm">
                             <TextInput
@@ -259,6 +270,7 @@ export default function LoginScreen({ onSuccess }) {
                                 </Text>
                             </Group>
 
+                            {/* ปุ่มใช้สีเดิม (blue) */}
                             <Button
                                 type="submit"
                                 mt="md"
@@ -272,6 +284,7 @@ export default function LoginScreen({ onSuccess }) {
                         </Stack>
                     </form>
 
+                    {/* Footer: แสดง Version ของแอป */}
                     <Text
                         size="xs"
                         c="dimmed"
