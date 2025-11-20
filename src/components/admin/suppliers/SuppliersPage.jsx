@@ -75,7 +75,7 @@ export default function SuppliersPage({ auth, onLogout }) {
             params.append("page", String(page));
 
             const data = await apiRequest(
-                `/suppliers?${params.toString()}`,
+                `/suppliers/?${params.toString()}`,
                 {},
                 auth
             );
