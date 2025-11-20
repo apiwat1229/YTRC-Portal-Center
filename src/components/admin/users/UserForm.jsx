@@ -8,10 +8,7 @@ import {
     Text,
     TextInput,
 } from "@mantine/core";
-import { showNotification } from "@mantine/notifications";
-import { IconCheck, IconX } from "@tabler/icons-react";
-import { useState } from "react";
-import { apiRequest } from "./userApi";
+import { useEffect, useState } from "react";
 
 /* ======= enums/choices ======= */
 const roleOptions = [
@@ -48,44 +45,55 @@ const positionOptions = [
     { value: "Staff", label: "Staff" },
 ];
 
+// helper แปลง initial → state form
+const buildInitialForm = (initial) => {
+    const role =
+        (initial?.role ? String(initial.role).toLowerCase() : "user") || "user";
+    const status =
+        (initial?.status ? String(initial.status).toLowerCase() : "active") ||
+        "active";
+
+    return {
+        email: initial?.email || "",
+        username: initial?.username || "",
+        first_name: initial?.first_name || "",
+        last_name: initial?.last_name || "",
+        display_name: initial?.display_name || "",
+        department: initial?.department || "",
+        position: initial?.position || "",
+        role,
+        status,
+        permissions: Array.isArray(initial?.permissions)
+            ? initial.permissions.join(", ")
+            : "",
+        is_superuser: Boolean(initial?.is_superuser),
+        hod_user_id: initial?.hod_user_id || "",
+        password: "",
+        confirm_password: "",
+    };
+};
+
+/**
+ * ฟอร์มผู้ใช้งานแบบ reusable
+ * - ไม่ยิง API เอง
+ * - ทำ validation + สร้าง payload แล้วส่งให้ onSubmit(payload)
+ */
 export default function UserForm({
-    auth,
-    mode, // "create" | "edit"
-    initial,
-    onSubmitSuccess,
-    onCancel,
-    setLoadingAction,
+    mode = "create",      // "create" | "edit"
+    initial = null,
+    onSubmit,             // async (payload) => void
+    onCancel,             // optional
+    submitting = false,   // ให้ parent คุม loading เอง
 }) {
     const isEdit = mode === "edit";
 
-    const [form, setForm] = useState(() => {
-        const role =
-            (initial?.role ? String(initial.role).toLowerCase() : "user") || "user";
-        const status =
-            (initial?.status ? String(initial.status).toLowerCase() : "active") ||
-            "active";
-
-        return {
-            email: initial?.email || "",
-            username: initial?.username || "",
-            first_name: initial?.first_name || "",
-            last_name: initial?.last_name || "",
-            display_name: initial?.display_name || "",
-            department: initial?.department || "",
-            position: initial?.position || "",
-            role,
-            status,
-            permissions: Array.isArray(initial?.permissions)
-                ? initial.permissions.join(", ")
-                : "",
-            is_superuser: Boolean(initial?.is_superuser),
-            hod_user_id: initial?.hod_user_id || "",
-            password: "", // create: required, edit: optional
-            confirm_password: "",
-        };
-    });
-
+    const [form, setForm] = useState(() => buildInitialForm(initial));
     const [error, setError] = useState(null);
+
+    // ถ้า initial เปลี่ยน (เช่นโหลด user เสร็จ) → reset form
+    useEffect(() => {
+        setForm(buildInitialForm(initial));
+    }, [initial]);
 
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -101,7 +109,7 @@ export default function UserForm({
         }
 
         // validate password & confirm
-        if (mode === "create") {
+        if (!isEdit) {
             if (!form.password) {
                 setError("กรุณากำหนดรหัสผ่านสำหรับผู้ใช้ใหม่");
                 return;
@@ -111,7 +119,6 @@ export default function UserForm({
                 return;
             }
         } else {
-            // edit mode: ถ้ากรอกอย่างใดอย่างหนึ่ง ต้องให้ตรงกันทั้งคู่
             const hasPassword = !!form.password;
             const hasConfirm = !!form.confirm_password;
             if (hasPassword || hasConfirm) {
@@ -131,6 +138,7 @@ export default function UserForm({
             return;
         }
 
+        // payload ที่พร้อมส่งให้ backend
         const payload = {
             email: form.email.trim(),
             username: form.username.trim() || null,
@@ -139,7 +147,7 @@ export default function UserForm({
             display_name: form.display_name || null,
             department: form.department || null,
             position: form.position || null,
-            role: form.role, // ตัวเล็กตาม enum
+            role: form.role,
             status: form.status,
             is_superuser: form.is_superuser,
             hod_user_id: form.hod_user_id || null,
@@ -155,69 +163,8 @@ export default function UserForm({
             payload.password = form.password;
         }
 
-        try {
-            setLoadingAction(true);
-            let result;
-
-            if (mode === "create") {
-                result = await apiRequest(
-                    "/users/",
-                    {
-                        method: "POST",
-                        body: JSON.stringify(payload),
-                    },
-                    auth
-                );
-                showNotification({
-                    title: "สร้างผู้ใช้งานสำเร็จ",
-                    message: result.display_name || result.email,
-                    color: "green",
-                    icon: <IconCheck size={16} />,
-                });
-            } else {
-                const userId =
-                    initial?.id || initial?._id || initial?.user_id || initial?.userId;
-
-                console.log("[UserForm] UPDATE userId:", userId);
-                console.log("[UserForm] UPDATE payload:", payload);
-
-                result = await apiRequest(
-                    `/users/${userId}`,
-                    {
-                        method: "PATCH",
-                        body: JSON.stringify(payload),
-                    },
-                    auth
-                );
-                showNotification({
-                    title: "อัปเดตผู้ใช้งานสำเร็จ",
-                    message: result.display_name || result.email,
-                    color: "green",
-                    icon: <IconCheck size={16} />,
-                });
-            }
-
-            if (typeof onSubmitSuccess === "function") {
-                onSubmitSuccess(result);
-            }
-        } catch (err) {
-            console.error("[UserForm] submit error:", err);
-            const msg =
-                typeof err.message === "string"
-                    ? err.message
-                    : Array.isArray(err)
-                        ? JSON.stringify(err)
-                        : "ไม่สามารถบันทึกข้อมูลผู้ใช้ได้";
-
-            setError(msg);
-            showNotification({
-                title: "บันทึกข้อมูลไม่สำเร็จ",
-                message: msg,
-                color: "red",
-                icon: <IconX size={16} />,
-            });
-        } finally {
-            setLoadingAction(false);
+        if (typeof onSubmit === "function") {
+            await onSubmit(payload);
         }
     };
 
@@ -229,8 +176,10 @@ export default function UserForm({
                         label="อีเมล"
                         required
                         value={form.email}
-                        onChange={(e) => handleChange("email", e.currentTarget.value)}
-                        description="ถใช้เฉพาะอีเมล"
+                        onChange={(e) =>
+                            handleChange("email", e.currentTarget.value)
+                        }
+                        description="ใช้เฉพาะอีเมลสำหรับเข้าสู่ระบบ"
                     />
                     <TextInput
                         label="Username"
@@ -301,7 +250,9 @@ export default function UserForm({
                         placeholder="สถานะ"
                         data={statusOptions}
                         value={form.status}
-                        onChange={(v) => handleChange("status", v || "active")}
+                        onChange={(v) =>
+                            handleChange("status", v || "active")
+                        }
                     />
                 </Group>
 
@@ -315,7 +266,11 @@ export default function UserForm({
 
                 <Group grow wrap="wrap">
                     <PasswordInput
-                        label={isEdit ? "Password (เปลี่ยนรหัสผ่านใหม่)" : "Password"}
+                        label={
+                            isEdit
+                                ? "Password (เปลี่ยนรหัสผ่านใหม่)"
+                                : "Password"
+                        }
                         value={form.password}
                         onChange={(e) =>
                             handleChange("password", e.currentTarget.value)
@@ -328,10 +283,17 @@ export default function UserForm({
                         }
                     />
                     <PasswordInput
-                        label={isEdit ? "ยืนยันรหัสผ่านใหม่" : "Confirm password"}
+                        label={
+                            isEdit
+                                ? "ยืนยันรหัสผ่านใหม่"
+                                : "Confirm password"
+                        }
                         value={form.confirm_password}
                         onChange={(e) =>
-                            handleChange("confirm_password", e.currentTarget.value)
+                            handleChange(
+                                "confirm_password",
+                                e.currentTarget.value
+                            )
                         }
                         required={!isEdit}
                         description={
@@ -342,6 +304,15 @@ export default function UserForm({
                     />
                 </Group>
 
+                <TextInput
+                    label="Permissions (comma separated)"
+                    value={form.permissions}
+                    onChange={(e) =>
+                        handleChange("permissions", e.currentTarget.value)
+                    }
+                    description="ตัวอย่าง: portal.admin.users.view, portal.app.qr.view"
+                />
+
                 {error && (
                     <Text size="xs" c="red">
                         {error}
@@ -349,10 +320,12 @@ export default function UserForm({
                 )}
 
                 <Group justify="flex-end" mt="sm">
-                    <Button variant="default" onClick={onCancel}>
-                        ยกเลิก
-                    </Button>
-                    <Button type="submit">
+                    {onCancel && (
+                        <Button variant="default" onClick={onCancel}>
+                            ยกเลิก
+                        </Button>
+                    )}
+                    <Button type="submit" loading={submitting}>
                         {isEdit ? "บันทึกการเปลี่ยนแปลง" : "สร้างผู้ใช้"}
                     </Button>
                 </Group>

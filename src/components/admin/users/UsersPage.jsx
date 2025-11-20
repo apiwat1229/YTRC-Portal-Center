@@ -13,25 +13,27 @@ import {
     Stack,
     Text,
     TextInput,
+    ThemeIcon,
     Title,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import {
-    IconArrowLeft,
     IconCheck,
     IconPlus,
     IconUserCog,
     IconUsers,
-    IconX,
+    IconX
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
-import { can, isSuperuser } from "../../auth/permission";
+import { useNavigate } from "react-router-dom";
 
+import { can, isSuperuser } from "../../auth/permission";
+import UserHeaderPanel from "../../common/UserHeaderPanel";
 import { apiRequest } from "./userApi";
-import UserForm from "./UserForm";
 import UsersTable from "./UsersTable";
 
+// ----- Filter options -----
 const ROLE_FILTER_OPTIONS = [
     { value: "super_admin", label: "Super Admin" },
     { value: "admin", label: "Admin" },
@@ -45,11 +47,12 @@ const STATUS_FILTER_OPTIONS = [
     { value: "suspended", label: "Suspended" },
 ];
 
-// ✅ helper ใช้ทุกที่ที่ต้องดึง userId
+// helper ใช้ทุกที่ที่ต้องดึง userId
 const getUserId = (u) => u?.id || u?._id || u?.user_id || u?.userId || null;
 
 export default function UsersPage({ auth, onLogout, onBack }) {
     const { user } = auth || {};
+    const navigate = useNavigate();
 
     const canViewUsers = can(user, "portal.admin.users.view");
     const canManageUsers =
@@ -59,8 +62,8 @@ export default function UsersPage({ auth, onLogout, onBack }) {
     const [loading, setLoading] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
     const [search, setSearch] = useState("");
-    const [roleFilter, setRoleFilter] = useState(null); // enum ตัวเล็ก
-    const [statusFilter, setStatusFilter] = useState(null); // enum ตัวเล็ก
+    const [roleFilter, setRoleFilter] = useState(null);
+    const [statusFilter, setStatusFilter] = useState(null);
     const [page, setPage] = useState(1);
     const limit = 50;
 
@@ -86,7 +89,11 @@ export default function UsersPage({ auth, onLogout, onBack }) {
             params.append("limit", String(limit));
             params.append("page", String(page));
 
-            const data = await apiRequest(`/users/?${params.toString()}`, {}, auth);
+            const data = await apiRequest(
+                `/users/?${params.toString()}`,
+                {},
+                auth
+            );
             setUsers(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("[UsersPage] fetchUsers error:", err);
@@ -132,36 +139,18 @@ export default function UsersPage({ auth, onLogout, onBack }) {
         });
     };
 
-    const openUserModal = (mode, userRecord = null) => {
+    // ไปหน้า "สร้างผู้ใช้ใหม่"
+    const handleCreateUser = () => {
         if (!canManageUsers) return;
+        navigate("/system/users/new");
+    };
 
-        const isEdit = mode === "edit";
-
-        modals.open({
-            title: isEdit ? "แก้ไขผู้ใช้งาน" : "สร้างผู้ใช้งานใหม่",
-            radius: "md",
-            size: "lg",
-            children: (
-                <UserForm
-                    auth={auth}
-                    mode={mode}
-                    initial={userRecord}
-                    onSubmitSuccess={(saved) => {
-                        setUsers((prev) => {
-                            if (isEdit) {
-                                return prev.map((u) =>
-                                    getUserId(u) === getUserId(saved) ? saved : u
-                                );
-                            }
-                            return [saved, ...prev];
-                        });
-                        modals.closeAll();
-                    }}
-                    onCancel={() => modals.closeAll()}
-                    setLoadingAction={setLoadingAction}
-                />
-            ),
-        });
+    // ไปหน้า "แก้ไขผู้ใช้"
+    const handleEditUser = (u) => {
+        if (!canManageUsers) return;
+        const userId = getUserId(u);
+        if (!userId) return;
+        navigate(`/system/users/${userId}/edit`);
     };
 
     const handleDeleteUser = (u) => {
@@ -185,7 +174,8 @@ export default function UsersPage({ auth, onLogout, onBack }) {
             confirmProps: { color: "red" },
             onConfirm: async () => {
                 if (!userId) {
-                    const msg = "ไม่พบ ID ของผู้ใช้งาน (u.id เป็น undefined)";
+                    const msg =
+                        "ไม่พบ ID ของผู้ใช้งาน (u.id เป็น undefined)";
                     console.error("[UsersPage] delete: missing userId", u);
                     showNotification({
                         title: "ลบผู้ใช้งานไม่สำเร็จ",
@@ -200,7 +190,11 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                     setLoadingAction(true);
                     console.log("[UsersPage] DELETE userId:", userId);
 
-                    await apiRequest(`/users/${userId}`, { method: "DELETE" }, auth);
+                    await apiRequest(
+                        `/users/${userId}`,
+                        { method: "DELETE" },
+                        auth
+                    );
 
                     setUsers((prev) =>
                         prev.filter((x) => getUserId(x) !== userId)
@@ -216,7 +210,8 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                     console.error("[UsersPage] delete error:", err);
                     showNotification({
                         title: "ลบผู้ใช้งานไม่สำเร็จ",
-                        message: err.message || "เกิดข้อผิดพลาดในการลบผู้ใช้",
+                        message:
+                            err.message || "เกิดข้อผิดพลาดในการลบผู้ใช้",
                         color: "red",
                         icon: <IconX size={16} />,
                     });
@@ -227,69 +222,99 @@ export default function UsersPage({ auth, onLogout, onBack }) {
         });
     };
 
-    // กรณีไม่มีสิทธิ์
+    // ---------- กรณีไม่มีสิทธิ์ ----------
     if (!canViewUsers) {
         return (
-            <div className="app-bg">
+            <div
+                style={{
+                    minHeight: "100vh",
+                    backgroundColor: "#f3f4f6",
+                    backgroundImage:
+                        "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%)",
+                    fontFamily: "'Outfit', system-ui, sans-serif",
+                }}
+            >
                 <AppShell
                     padding="md"
-                    header={{ height: 64 }}
                     styles={{ main: { backgroundColor: "transparent" } }}
                 >
-                    <AppShell.Header>
-                        <Group
-                            h="100%"
-                            px="md"
-                            justify="space-between"
-                            style={{
-                                borderBottom: "1px solid rgba(226, 232, 240, 1)",
-                                backgroundColor: "white",
-                            }}
-                        >
-                            <Group gap="xs">
-                                <IconUsers size={20} />
-                                <Text fw={600}>User Management</Text>
-                                <Badge size="xs" radius="lg" variant="light" color="red">
-                                    NO ACCESS
-                                </Badge>
-                            </Group>
-
-                            <Group gap="sm">
-                                {onBack && (
-                                    <Button
-                                        variant="subtle"
-                                        size="xs"
-                                        leftSection={<IconArrowLeft size={14} />}
-                                        onClick={onBack}
-                                    >
-                                        Back
-                                    </Button>
-                                )}
-                                <Button
-                                    variant="outline"
-                                    size="xs"
-                                    color="gray"
-                                    onClick={handleLogoutClick}
-                                >
-                                    Logout
-                                </Button>
-                            </Group>
-                        </Group>
-                    </AppShell.Header>
-
                     <AppShell.Main>
-                        <Container size="lg" py="md">
-                            <Center style={{ minHeight: "50vh" }}>
-                                <Stack gap="xs" align="center">
-                                    <Title order={3}>ไม่มีสิทธิ์เข้าถึง User Management</Title>
-                                    <Text size="sm" c="dimmed" ta="center">
-                                        กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
-                                        <Badge size="xs" variant="dot" color="violet">
-                                            portal.admin.users.view
-                                        </Badge>
-                                    </Text>
-                                </Stack>
-                            </Center>
+                        <Container size="xl" py="md">
+                            <Stack gap="xl">
+                                {/* HEADER แบบ Starter + UserHeaderPanel */}
+                                <Group justify="space-between" align="center">
+                                    <Group gap="md">
+                                        <ThemeIcon
+                                            size={48}
+                                            radius="md"
+                                            variant="gradient"
+                                            gradient={{
+                                                from: "red",
+                                                to: "orange",
+                                                deg: 135,
+                                            }}
+                                        >
+                                            <IconUsers size={28} />
+                                        </ThemeIcon>
+                                        <div>
+                                            <Text
+                                                size="xl"
+                                                fw={800}
+                                                style={{
+                                                    letterSpacing: "-0.5px",
+                                                    lineHeight: 1.1,
+                                                    color: "#1e293b",
+                                                }}
+                                            >
+                                                USER MANAGEMENT
+                                            </Text>
+                                            <Text
+                                                size="xs"
+                                                fw={500}
+                                                c="dimmed"
+                                                tt="uppercase"
+                                                style={{
+                                                    letterSpacing: "1px",
+                                                }}
+                                            >
+                                                Access Restricted
+                                            </Text>
+                                        </div>
+                                    </Group>
+
+                                    <UserHeaderPanel
+                                        user={user}
+                                        displayName={displayName}
+                                        onBackClick={onBack}
+                                        onNotificationsClick={undefined}
+                                        onLogout={handleLogoutClick}
+                                        notificationsCount={0}
+                                    />
+                                </Group>
+
+                                {/* เนื้อหา: แจ้งไม่มีสิทธิ์ */}
+                                <Center style={{ minHeight: "50vh" }}>
+                                    <Stack gap="xs" align="center">
+                                        <Title order={3}>
+                                            ไม่มีสิทธิ์เข้าถึง User Management
+                                        </Title>
+                                        <Text
+                                            size="sm"
+                                            c="dimmed"
+                                            ta="center"
+                                        >
+                                            กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
+                                            <Badge
+                                                size="xs"
+                                                variant="dot"
+                                                color="violet"
+                                            >
+                                                portal.admin.users.view
+                                            </Badge>
+                                        </Text>
+                                    </Stack>
+                                </Center>
+                            </Stack>
                         </Container>
                     </AppShell.Main>
                 </AppShell>
@@ -297,74 +322,93 @@ export default function UsersPage({ auth, onLogout, onBack }) {
         );
     }
 
-    // ปกติ (มีสิทธิ์)
+    // ---------- ปกติ (มีสิทธิ์) ----------
     return (
-        <div className="app-bg">
+        <div
+            style={{
+                minHeight: "100vh",
+                backgroundColor: "#f3f4f6",
+                backgroundImage:
+                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%)",
+                fontFamily: "'Outfit', system-ui, sans-serif",
+            }}
+        >
             <AppShell
                 padding="md"
-                header={{ height: 64 }}
                 styles={{
                     main: { backgroundColor: "transparent" },
                 }}
             >
-                <AppShell.Header>
-                    <Group
-                        h="100%"
-                        px="md"
-                        justify="space-between"
-                        style={{
-                            borderBottom: "1px solid rgba(226, 232, 240, 1)",
-                            backgroundColor: "white",
-                        }}
-                    >
-                        <Group gap="xs">
-                            <IconUserCog size={20} />
-                            <Text fw={600}>User Management</Text>
-                            <Badge size="xs" radius="lg" variant="light" color="blue">
-                                SYSTEM
-                            </Badge>
-                        </Group>
-
-                        <Group gap="sm">
-                            <Text size="sm" c="dimmed">
-                                {displayName}
-                            </Text>
-
-                            {onBack && (
-                                <Button
-                                    variant="subtle"
-                                    size="xs"
-                                    leftSection={<IconArrowLeft size={14} />}
-                                    onClick={onBack}
-                                >
-                                    Back
-                                </Button>
-                            )}
-
-                            <Button
-                                variant="outline"
-                                size="xs"
-                                color="gray"
-                                onClick={handleLogoutClick}
-                            >
-                                Logout
-                            </Button>
-                        </Group>
-                    </Group>
-                </AppShell.Header>
-
                 <AppShell.Main>
-                    <Container size="lg" py="md">
-                        <Stack gap="md">
+                    <Container size="xl" py="md">
+                        <Stack gap="xl">
+                            {/* === HEADER SECTION (Hero + UserHeaderPanel) === */}
+                            <Group justify="space-between" align="center">
+                                <Group gap="md">
+                                    <ThemeIcon
+                                        size={48}
+                                        radius="md"
+                                        variant="gradient"
+                                        gradient={{
+                                            from: "blue",
+                                            to: "indigo",
+                                            deg: 135,
+                                        }}
+                                    >
+                                        <IconUserCog size={28} />
+                                    </ThemeIcon>
+                                    <div>
+                                        <Text
+                                            size="xl"
+                                            fw={800}
+                                            style={{
+                                                letterSpacing: "-0.5px",
+                                                lineHeight: 1.1,
+                                                color: "#1e293b",
+                                            }}
+                                        >
+                                            USER MANAGEMENT
+                                        </Text>
+                                        <Text
+                                            size="xs"
+                                            fw={500}
+                                            c="dimmed"
+                                            tt="uppercase"
+                                            style={{ letterSpacing: "1px" }}
+                                        >
+                                            System Center · Manage accounts &
+                                            roles
+                                        </Text>
+                                    </div>
+                                </Group>
 
-                            <Card withBorder radius="md" style={{ backgroundColor: "white" }}>
+                                <UserHeaderPanel
+                                    user={user}
+                                    displayName={displayName}
+                                    onBackClick={onBack}
+                                    onNotificationsClick={undefined}
+                                    onLogout={handleLogoutClick}
+                                    notificationsCount={0}
+                                />
+                            </Group>
+
+                            {/* === MAIN CARD CONTENT (Filters + Table) === */}
+                            <Card
+                                withBorder
+                                radius="md"
+                                style={{ backgroundColor: "white" }}
+                            >
                                 <Stack gap="sm">
                                     {/* Filter + Actions */}
-                                    <Group justify="space-between" align="flex-end">
+                                    <Group
+                                        justify="space-between"
+                                        align="flex-end"
+                                    >
                                         <Stack gap={2}>
                                             <Title order={5}>Users</Title>
                                             <Text size="xs" c="dimmed">
-                                                รายชื่อผู้ใช้งานทั้งหมดในระบบ (เฉพาะ Super Admin / Admin)
+                                                รายชื่อผู้ใช้งานทั้งหมดในระบบ
+                                                (เฉพาะ Super Admin / Admin)
                                             </Text>
                                         </Stack>
 
@@ -374,7 +418,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                                 value={search}
                                                 onChange={(e) => {
                                                     setPage(1);
-                                                    setSearch(e.currentTarget.value);
+                                                    setSearch(
+                                                        e.currentTarget.value
+                                                    );
                                                 }}
                                                 size="xs"
                                                 style={{ minWidth: 220 }}
@@ -407,8 +453,12 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                             {canManageUsers && (
                                                 <Button
                                                     size="xs"
-                                                    leftSection={<IconPlus size={14} />}
-                                                    onClick={() => openUserModal("create", null)}
+                                                    leftSection={
+                                                        <IconPlus size={14} />
+                                                    }
+                                                    onClick={
+                                                        handleCreateUser
+                                                    }
                                                 >
                                                     New user
                                                 </Button>
@@ -430,7 +480,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                             users={users}
                                             loading={loading}
                                             canManageUsers={canManageUsers}
-                                            onEdit={(u) => openUserModal("edit", u)}
+                                            onEdit={handleEditUser}
                                             onDelete={handleDeleteUser}
                                         />
                                     </Box>

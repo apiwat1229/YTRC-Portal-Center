@@ -5,12 +5,8 @@ import {
   Navigate,
   Route,
   Routes,
-  useLocation,
 } from "react-router-dom";
 
-import PermissionsPanel from "./components/admin/PermissionsPanel";
-import SystemMenuPortalPage from "./components/system/SystemMenuPortalPage";
-import UsersPage from "./components/admin/users/UsersPage";
 import LoginScreen from "./components/auth/LoginScreen";
 import Error404Page from "./components/error/Error404Page";
 import Error500Page from "./components/error/Error500Page";
@@ -22,25 +18,10 @@ import {
   saveAuth,
 } from "./components/auth/authStorage";
 
-/**
- * หุ้ม route ที่ต้อง login ให้ใช้ได้เฉพาะตอนมี auth เท่านั้น
- */
-function RequireAuth({ auth, children }) {
-  const location = useLocation();
+import { renderSystemRoutes } from "./routes/SystemRoutes"; // 👈 ใช้ฟังก์ชันนี้
 
-  if (!auth) {
-    // ยังไม่ login → เด้งไป /login พร้อมจำ path เดิมเผื่อใช้ต่อ
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return children;
-}
-
-/**
- * App หลัก
- */
 export default function App() {
-  // อ่านค่าเริ่มต้นจาก localStorage (กันหลุด session ตอนกด Reload)
+  // อ่านค่าเริ่มต้นจาก localStorage (กันหลุด session ตอน Reload)
   const [auth, setAuth] = useState(() => loadAuth());
   const [appError, setAppError] = useState(null);
 
@@ -58,10 +39,10 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* ✅ BG เดียวทั้งแอป (ใช้ร่วมกับ .app-bg ใน CSS) */}
+      {/* BG เดียวทั้งแอป (ใช้ร่วมกับ .app-bg ใน CSS) */}
       <div className="app-bg">
         <Routes>
-          {/* หน้า Login */}
+          {/* ===== หน้า Login ===== */}
           <Route
             path="/login"
             element={
@@ -84,79 +65,39 @@ export default function App() {
             }
           />
 
-          {/* หน้า Portal (ต้อง login) */}
+          {/* ===== หน้า Portal Center หลัก (หลัง login) ===== */}
           <Route
             path="/"
             element={
-              <RequireAuth auth={auth}>
+              auth ? (
                 <PortalCenterPage
                   auth={auth}
                   onLogout={handleLogout}
-                // ถ้าอยากให้หน้าใน portal ส่ง error กลาง → setAppError ได้
-                // onError={setAppError}
+                  onError={setAppError}
                 />
-              </RequireAuth>
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
 
-          {/* หน้า System Menu (ต้อง login) */}
-          <Route
-            path="/system"
-            element={
-              <RequireAuth auth={auth}>
-                <SystemMenuPortalPage
-                  auth={auth}
-                  onBack={() => {
-                    // กลับไปหน้า Portal
-                    if (window.history.length > 1) {
-                      window.history.back();
-                    } else {
-                      window.location.href = "/";
-                    }
-                  }}
-                />
-              </RequireAuth>
-            }
-          />
+          {/* ===== กลุ่ม /system (import จาก SystemRoutes.jsx) ===== */}
+          {renderSystemRoutes({ auth, onLogout: handleLogout })}
 
-          <Route
-            path="/system/users"
-            element={
-              <RequireAuth auth={auth}>
-                <UsersPage
-                  auth={auth}
-                  onLogout={handleLogout}
-                  onBack={() => {
-                    // กลับไปหน้า System Menu
-                    window.history.length > 1
-                      ? window.history.back()
-                      : (window.location.href = "/system");
-                  }}
-                />
-              </RequireAuth>
-            }
-          />
-
-          <Route
-            path="/system/permissions"
-            element={<PermissionsPanel auth={auth} />}
-          />
-
-          {/* Error 500 (เอาไว้โยน error กลาง ๆ มาแสดง) */}
+          {/* ===== Error 500 (แสดง error กลาง ๆ) ===== */}
           <Route
             path="/error"
             element={
               <Error500Page
                 message={appError}
                 onRetry={() => {
-                  // ดีฟอลต์: reload กลับหน้าแรก
                   window.location.href = "/";
                 }}
               />
             }
           />
 
-          {/* 404: path ที่ไม่แมตช์อะไรเลย */}
+          {/* ===== 404: path ที่ไม่ตรงอะไรเลย ===== */}
           <Route path="*" element={<Error404Page />} />
         </Routes>
       </div>
