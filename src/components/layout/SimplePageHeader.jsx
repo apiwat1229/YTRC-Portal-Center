@@ -1,7 +1,13 @@
 // src/components/layout/SimplePageHeader.jsx
 import { ActionIcon, Box, Group, Text } from "@mantine/core";
 import { IconMinus, IconSquare, IconX } from "@tabler/icons-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEffect, useRef } from "react";
+
+// helper เช็คว่า run อยู่ใน Tauri จริงหรือเปล่า
+function isTauri() {
+    return typeof window !== "undefined" && "__TAURI__" in window;
+}
 
 export default function SimplePageHeader({
     title,
@@ -23,12 +29,22 @@ export default function SimplePageHeader({
     const titleSize = compact ? "md" : "lg";
     const iconAdjustedSize = compact ? iconSize - 4 : iconSize;
 
+    // เก็บ instance ของ window ปัจจุบัน
+    const winRef = useRef(null);
+
+    useEffect(() => {
+        if (isTauri()) {
+            winRef.current = getCurrentWebviewWindow();
+        }
+    }, []);
+
     // ---------- Handlers ที่ผูกกับ Tauri window ----------
     const handleMinimize = async () => {
         if (onMinimize) return onMinimize();
+        if (!winRef.current) return; // กรณีรันใน browser / ยังไม่ได้ init
+
         try {
-            const win = getCurrentWindow();
-            await win.minimize();
+            await winRef.current.minimize();
         } catch (e) {
             console.error("Failed to minimize window:", e);
         }
@@ -36,9 +52,10 @@ export default function SimplePageHeader({
 
     const handleMaximize = async () => {
         if (onMaximize) return onMaximize();
+        if (!winRef.current) return;
+
         try {
-            const win = getCurrentWindow();
-            await win.toggleMaximize();
+            await winRef.current.toggleMaximize();
         } catch (e) {
             console.error("Failed to toggle maximize:", e);
         }
@@ -46,9 +63,10 @@ export default function SimplePageHeader({
 
     const handleClose = async () => {
         if (onClose) return onClose();
+        if (!winRef.current) return;
+
         try {
-            const win = getCurrentWindow();
-            await win.close();
+            await winRef.current.close();
         } catch (e) {
             console.error("Failed to close window:", e);
         }
@@ -68,21 +86,20 @@ export default function SimplePageHeader({
                 alignItems: "center",
                 justifyContent: "space-between",
 
-                // ส่วนนี้คือ drag region
-                WebkitAppRegion: "drag",
-
+                // *** ตรงนี้จะโปร่งใส / glass ตามที่ตั้งค่า ***
                 backgroundColor: glass
                     ? `rgba(255, 255, 255, ${opacity})`
                     : "transparent",
                 backdropFilter: glass ? "blur(10px)" : "none",
                 WebkitBackdropFilter: glass ? "blur(10px)" : "none",
                 borderBottom: "1px solid rgba(226, 232, 240, 0.5)",
+
                 position: "sticky",
                 top: 0,
                 zIndex: 200,
             }}
         >
-            {/* LEFT: Icon + Title (ยังลาก window ได้) */}
+            {/* LEFT: Icon + Title (ลาก window ได้ เพราะอยู่ใน drag-region) */}
             <Group align="center" gap={compact ? 6 : "sm"}>
                 {Icon && (
                     <Icon
@@ -106,19 +123,20 @@ export default function SimplePageHeader({
             </Group>
 
             {/* RIGHT: ปุ่ม title bar (ต้องเป็น no-drag เพื่อให้กดได้) */}
-            <Group gap={compact ? 2 : 6} style={{ WebkitAppRegion: "no-drag" }}>
+            <Group
+                gap={compact ? 2 : 6}
+                data-tauri-drag-region="false" // ปิด drag เฉพาะตรงนี้
+            >
                 {/* Minimize */}
                 <ActionIcon
                     variant="subtle"
                     color="gray"
                     radius="md"
                     onClick={handleMinimize}
-                    data-tauri-drag-region="false"
                     style={{
                         width: compact ? 28 : 32,
                         height: compact ? 22 : 28,
                         transition: "background 150ms",
-                        WebkitAppRegion: "no-drag",
                     }}
                 >
                     <IconMinus size={compact ? 12 : 16} />
@@ -129,12 +147,10 @@ export default function SimplePageHeader({
                     variant="subtle"
                     radius="md"
                     onClick={handleMaximize}
-                    data-tauri-drag-region="false"
                     style={{
                         width: compact ? 28 : 32,
                         height: compact ? 22 : 28,
                         transition: "background 150ms",
-                        WebkitAppRegion: "no-drag",
                     }}
                 >
                     <IconSquare size={compact ? 12 : 14} />
@@ -146,12 +162,10 @@ export default function SimplePageHeader({
                     color="red"
                     radius="md"
                     onClick={handleClose}
-                    data-tauri-drag-region="false"
                     style={{
                         width: compact ? 28 : 32,
                         height: compact ? 22 : 28,
                         transition: "background 150ms",
-                        WebkitAppRegion: "no-drag",
                     }}
                 >
                     <IconX size={compact ? 12 : 16} />
