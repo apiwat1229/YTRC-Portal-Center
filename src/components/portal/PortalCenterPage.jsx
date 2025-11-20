@@ -318,12 +318,8 @@ export default function PortalCenterPage({
         >
             {/* ===== Glass Titlebar Header (ใช้ร่วมกับ Electron / Web ก็ได้) ===== */}
             <SimplePageHeader
-
-                glass={true}
-                opacity={0.0}
-                onMinimize={() => { }}
-                onMaximize={() => { }}
-                onClose={() => { }}
+                glass={true}     // blur
+                opacity={0.0}    // โปร่งใส 100%
                 compact={true}
             />
 
