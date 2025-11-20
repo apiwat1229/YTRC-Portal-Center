@@ -8,6 +8,8 @@ import UsersPage from "../components/admin/users/UsersPage";
 
 import RubberTypeEditorPage from "../components/admin/rubbertypes/RubberTypeEditorPage";
 import RubberTypesPage from "../components/admin/rubbertypes/RubberTypesPage";
+import SupplierEditorPage from "../components/admin/suppliers/SupplierEditorPage";
+import SuppliersPage from "../components/admin/suppliers/SuppliersPage";
 // ถ้ามีหน้า Permission Manager อยู่แล้ว ค่อยมา import เพิ่มทีหลังได้ เช่น:
 // import PermissionPage from "../components/admin/permissions/PermissionPage";
 
@@ -141,6 +143,22 @@ export function renderSystemRoutes({ auth, onLogout }) {
                         onLogout={onLogout}
                     />
                 )}
+            />
+
+            {/* Suppliers list */}
+            <Route
+                path="/cuplump/suppliers"
+                element={<SuppliersPage auth={auth} onLogout={onLogout} />}
+            />
+            {/* Create Supplier */}
+            <Route
+                path="/cuplump/suppliers/new"
+                element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
+            />
+            {/* Edit Supplier */}
+            <Route
+                path="/cuplump/suppliers/:supplierId/edit"
+                element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
             />
 
             {/*
