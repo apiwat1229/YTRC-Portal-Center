@@ -22,7 +22,10 @@
         "maximized": true,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true
+
+        "decorations": false,
+
+        "transparent": true
       }
     ],
     "security": {

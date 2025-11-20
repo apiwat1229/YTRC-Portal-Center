@@ -34,6 +34,7 @@ import {
 } from "@tabler/icons-react";
 
 import { can } from "../auth/permission";
+import SimplePageHeader from "../layout/SimplePageHeader";
 
 // ---------------- Helper: Permission ----------------
 function canView(user, permission) {
@@ -315,6 +316,17 @@ export default function PortalCenterPage({
                 fontFamily: "'Outfit', system-ui, sans-serif",
             }}
         >
+            {/* ===== Glass Titlebar Header (ใช้ร่วมกับ Electron / Web ก็ได้) ===== */}
+            <SimplePageHeader
+
+                glass={true}
+                opacity={0.0}
+                onMinimize={() => { }}
+                onMaximize={() => { }}
+                onClose={() => { }}
+                compact={true}
+            />
+
             <AppShell
                 padding="md"
                 styles={{ main: { backgroundColor: "transparent" } }}
@@ -322,7 +334,7 @@ export default function PortalCenterPage({
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
-                            {/* === HEADER SECTION === */}
+                            {/* === HEADER SECTION (Hero ของ Portal เดิม) === */}
                             <Group justify="space-between" align="center">
                                 <Group gap="md">
                                     <ThemeIcon
@@ -744,7 +756,6 @@ function AppWidget({
                     }}
                 />
 
-                {/* Open App text: element อยู่ตลอด แค่ซ่อน/แสดงด้วย style */}
                 <Text
                     size="xs"
                     fw={600}
