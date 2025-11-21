@@ -18,10 +18,8 @@ import { IconCalendar } from "@tabler/icons-react";
 
 import { http } from "@/helpers/http";
 
-// ===== ปรับให้ตรงกับ BE จริง =====
-// ตอนนี้อิง pattern เดิมของ API: /suppliers/ และ /rubber-types/
-const SUPPLIER_ENDPOINT = "/suppliers/";        // => https://.../api/suppliers/
-const RUBBERTYPE_ENDPOINT = "/rubber-types/";   // => https://.../api/rubber-types/
+const SUPPLIER_ENDPOINT = "/suppliers/";
+const RUBBERTYPE_ENDPOINT = "/rubber-types";
 
 function genBookingCode(dateObj, queueNo) {
     if (!dateObj || !queueNo) return "";
@@ -32,15 +30,13 @@ function genBookingCode(dateObj, queueNo) {
 }
 
 /**
- * Drawer สำหรับ Add Booking แยกเป็น component ต่างหาก
+ * Drawer สำหรับ Add Booking
  *
  * props:
  *  - opened: boolean
  *  - onClose: () => void
- *  - defaults: {
- *      start_time, end_time, date, queue_no, recorder
- *    }
- *  - onSuccess: () => void   // เรียกเมื่อบันทึกสำเร็จ
+ *  - defaults: { start_time, end_time, date, queue_no, recorder }
+ *  - onSuccess: () => void
  */
 export default function AddBookingDrawer({
     opened,
@@ -54,18 +50,19 @@ export default function AddBookingDrawer({
         date: new Date(),
         booking_code: "",
         queue_no: "",
-        supplier: "",
+        supplier_code: "",
+        supplier_name: "",
         truck_type: "",
         license_plate: "",
         rubber_type: "",
+        rubber_type_name: "",
         recorder: "",
     });
 
-    // options จาก BE
     const [supplierOptions, setSupplierOptions] = useState([]);
     const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
 
-    // เวลาเปิด drawer หรือ defaults เปลี่ยน → ตั้งค่าเริ่มต้นในฟอร์ม
+    // ==== ตั้งค่า default เมื่อเปิด Drawer ====
     useEffect(() => {
         if (!opened) return;
 
@@ -73,21 +70,24 @@ export default function AddBookingDrawer({
         const date = base.date || new Date();
         const queueNo = base.queue_no ?? 1;
 
-        setForm({
+        setForm((prev) => ({
+            ...prev,
             start_time: base.start_time || "08:00",
             end_time: base.end_time || "09:00",
             date,
             booking_code: genBookingCode(date, queueNo),
             queue_no: String(queueNo),
-            supplier: "",
+            supplier_code: "",
+            supplier_name: "",
             truck_type: "",
             license_plate: "",
             rubber_type: "",
+            rubber_type_name: "",
             recorder: base.recorder || "",
-        });
+        }));
     }, [opened, defaults]);
 
-    // โหลด suppliers & rubber types จาก BE ทุกครั้งที่เปิด drawer
+    // ==== โหลด Suppliers + RubberTypes เมื่อเปิด Drawer ====
     useEffect(() => {
         if (!opened) return;
 
@@ -102,29 +102,46 @@ export default function AddBookingDrawer({
                     ? resp.data
                     : resp.data?.items || [];
 
-                const options = data.map((s) => {
+                const options = data.map((s, idx) => {
                     const code =
+                        s.sup_code ||
                         s.code ||
                         s.supplier_code ||
-                        s.sup_code ||
-                        s.id ||
-                        s._id ||
-                        "";
+                        String(s.id ?? s._id ?? idx);
+
+                    const firstLast = [s.first_name, s.last_name]
+                        .filter(Boolean)
+                        .join(" ");
+
                     const name =
-                        s.name ||
-                        s.name_th ||
-                        s.supplier_name ||
+                        s.display_name ||
+                        firstLast ||
                         s.full_name ||
+                        s.name_th ||
+                        s.name_en ||
+                        s.name ||
                         "";
-                    const label = [code, name].filter(Boolean).join(" : ");
+
+                    // Supplier: แสดง 1229-ชื่อเต็ม
+                    const label = [code, name].filter(Boolean).join("-");
 
                     return {
-                        value: name || code || "",
+                        value: code,
                         label: label || "(unknown supplier)",
+                        rawName: name,
                     };
                 });
 
-                setSupplierOptions(options);
+                const seen = new Set();
+                const uniqueOptions = [];
+                for (const opt of options) {
+                    if (!seen.has(opt.value)) {
+                        seen.add(opt.value);
+                        uniqueOptions.push(opt);
+                    }
+                }
+
+                setSupplierOptions(uniqueOptions);
             } catch (err) {
                 console.error("[AddBookingDrawer] fetch suppliers error:", err);
                 setSupplierOptions([]);
@@ -142,28 +159,38 @@ export default function AddBookingDrawer({
                     ? resp.data
                     : resp.data?.items || [];
 
-                const options = data.map((r) => {
+                const options = data.map((r, idx) => {
                     const code =
                         r.code ||
                         r.rubbertype_code ||
-                        r.rt_code ||
-                        r.id ||
-                        r._id ||
-                        "";
+                        r.rubber_code ||
+                        String(r.id ?? r._id ?? idx);
+
                     const name =
                         r.name ||
                         r.rubbertype_name ||
+                        r.description_th ||
                         r.description ||
                         "";
-                    const label = [code, name].filter(Boolean).join(" : ");
 
+                    // ❗ Type: ให้แสดงเฉพาะ label = name
                     return {
-                        value: name || code || "",
-                        label: label || "(unknown type)",
+                        value: code,                 // ส่ง code ไปให้ BE
+                        label: name || code || "-",  // UI เห็นแค่ชื่อ
+                        rawName: name,
                     };
                 });
 
-                setRubberTypeOptions(options);
+                const seen = new Set();
+                const uniqueOptions = [];
+                for (const opt of options) {
+                    if (!seen.has(opt.value)) {
+                        seen.add(opt.value);
+                        uniqueOptions.push(opt);
+                    }
+                }
+
+                setRubberTypeOptions(uniqueOptions);
             } catch (err) {
                 console.error("[AddBookingDrawer] fetch rubber types error:", err);
                 setRubberTypeOptions([]);
@@ -174,20 +201,32 @@ export default function AddBookingDrawer({
         fetchRubberTypes();
     }, [opened]);
 
+    // ==== helpers ====
     const updateForm = (field, value) => {
         setForm((prev) => {
             const next = { ...prev, [field]: value };
 
-            // auto-gen booking code ถ้าเปลี่ยน date หรือ queue
-            if (field === "date" || field === "queue_no") {
-                const q = field === "queue_no" ? value : next.queue_no;
-                if (next.date && q) {
-                    next.booking_code = genBookingCode(next.date, q);
+            // booking code เปลี่ยนเฉพาะตอนเปลี่ยน date (queue_no มาจาก BE อย่างเดียว)
+            if (field === "date") {
+                if (next.date && next.queue_no) {
+                    next.booking_code = genBookingCode(next.date, next.queue_no);
                 }
             }
 
             return next;
         });
+    };
+
+    const handleSupplierChange = (val) => {
+        const selected = supplierOptions.find((opt) => opt.value === val);
+        updateForm("supplier_code", val || "");
+        updateForm("supplier_name", selected?.rawName || "");
+    };
+
+    const handleRubberTypeChange = (val) => {
+        const selected = rubberTypeOptions.find((opt) => opt.value === val);
+        updateForm("rubber_type", val || "");
+        updateForm("rubber_type_name", selected?.rawName || "");
     };
 
     const handleSubmit = async (e) => {
@@ -200,10 +239,12 @@ export default function AddBookingDrawer({
                 end_time: form.end_time,
                 queue_no: form.queue_no ? Number(form.queue_no) : undefined,
                 booking_code: form.booking_code || undefined,
-                supplier_name: form.supplier || undefined,
+                supplier_code: form.supplier_code || undefined,
+                supplier_name: form.supplier_name || undefined,
                 truck_type: form.truck_type || undefined,
                 truck_register: form.license_plate || undefined,
                 rubber_type: form.rubber_type || undefined,
+                rubber_type_name: form.rubber_type_name || undefined,
                 recorder: form.recorder || undefined,
             };
 
@@ -277,13 +318,12 @@ export default function AddBookingDrawer({
 
                         {/* Queue / Supplier */}
                         <Grid.Col span={{ base: 12, sm: 6 }}>
+                            {/* ❗ Queue: ห้ามแก้ไข อ่านอย่างเดียว */}
                             <NumberInput
                                 label="Queue *"
                                 value={form.queue_no}
-                                min={1}
-                                onChange={(val) =>
-                                    updateForm("queue_no", val === "" ? "" : Number(val))
-                                }
+                                readOnly
+                                disabled
                             />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -293,8 +333,8 @@ export default function AddBookingDrawer({
                                 data={supplierOptions}
                                 searchable
                                 nothingFoundMessage="ไม่พบ Supplier"
-                                value={form.supplier}
-                                onChange={(val) => updateForm("supplier", val || "")}
+                                value={form.supplier_code}
+                                onChange={handleSupplierChange}
                             />
                         </Grid.Col>
 
@@ -333,16 +373,15 @@ export default function AddBookingDrawer({
                                 searchable
                                 nothingFoundMessage="ไม่พบ Rubber Type"
                                 value={form.rubber_type}
-                                onChange={(val) => updateForm("rubber_type", val || "")}
+                                onChange={handleRubberTypeChange}
                             />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
+                            {/* ❗ Recorder: ห้ามแก้ไข ใช้ค่าจาก defaults / auth */}
                             <TextInput
                                 label="Recorder"
                                 value={form.recorder}
-                                onChange={(e) =>
-                                    updateForm("recorder", e.currentTarget.value)
-                                }
+                                readOnly
                             />
                         </Grid.Col>
                     </Grid>

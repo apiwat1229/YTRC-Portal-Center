@@ -19,6 +19,7 @@ import {
     Title,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
+import { modals } from "@mantine/modals";
 import {
     IconActivity,
     IconCalendar,
@@ -47,12 +48,31 @@ function formatSlotLabel(value) {
     return found ? found.label : value;
 }
 
-function parseSlot(value) {
-    if (!value || !value.includes("-")) {
-        return { start: "08:00", end: "09:00" };
-    }
-    const [start, end] = value.split("-");
-    return { start, end };
+/**
+ * กติกาคิวต่อวัน:
+ * - 08:00-09:00  → Queue 1-4   (max 4)
+ * - 09:00-10:00  → Queue 5-8   (max 4)
+ * - 10:00-11:00  → Queue 9-12  (max 4)
+ * - 11:00-12:00  → Queue 13-16 (max 4)
+ * - 13:00-14:00  → Queue 17-20 (max 4)
+ * - 14:00-15:00  → Queue 21+   (ไม่จำกัด)
+ */
+const SLOT_QUEUE_CONFIG = {
+    "08:00-09:00": { start: 1, limit: 4 },
+    "09:00-10:00": { start: 5, limit: 4 },
+    "10:00-11:00": { start: 9, limit: 4 },
+    "11:00-12:00": { start: 13, limit: 4 },
+    "13:00-14:00": { start: 17, limit: 4 },
+    "14:00-15:00": { start: 21, limit: null }, // null = ไม่จำกัด
+};
+
+function getSlotConfig(slotValue) {
+    return SLOT_QUEUE_CONFIG[slotValue] ?? { start: 1, limit: null };
+}
+
+// helper หาค่า id ของ booking จาก object ที่ BE ส่งมา (รองรับหลายชื่อ)
+function getQueueId(q) {
+    return q?.id || q?._id || q?.booking_id || null;
 }
 
 export default function BookingQueuePage({
@@ -71,9 +91,12 @@ export default function BookingQueuePage({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    // Drawer state ที่ใช้ร่วมกับ component AddBookingDrawer
+    // Drawer state
     const [drawerOpened, setDrawerOpened] = useState(false);
     const [drawerDefaults, setDrawerDefaults] = useState(null);
+
+    // ลบอยู่ตัวไหน
+    const [deletingId, setDeletingId] = useState(null);
 
     // ===== ชื่อใน header ขวาบน =====
     const displayName = useMemo(() => {
@@ -97,6 +120,30 @@ export default function BookingQueuePage({
     );
 
     const effectiveNotificationsCount = notificationsCount;
+
+    // ===== คำนวณคิวตาม slot & จำนวนคิวใน slot ปัจจุบัน =====
+    const slotConfig = useMemo(
+        () => getSlotConfig(selectedSlot),
+        [selectedSlot],
+    );
+
+    const isSlotFull = useMemo(() => {
+        if (!slotConfig.limit) return false; // ไม่จำกัด
+        return queues.length >= slotConfig.limit;
+    }, [slotConfig, queues]);
+
+    const nextQueueNo = useMemo(
+        () => slotConfig.start + queues.length, // start + จำนวนที่มีอยู่
+        [slotConfig, queues],
+    );
+
+    const slotQueueRangeLabel = useMemo(() => {
+        if (!slotConfig.limit) {
+            return `Queue ${slotConfig.start} ขึ้นไป (ไม่จำกัดคิว)`;
+        }
+        const end = slotConfig.start + slotConfig.limit - 1;
+        return `Queue ${slotConfig.start} - ${end}`;
+    }, [slotConfig]);
 
     // ------- ดึงข้อมูลจาก /bookings/queues -------
     const fetchQueues = async () => {
@@ -130,48 +177,84 @@ export default function BookingQueuePage({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDate, selectedSlot]);
 
+    // ------- handler เวลาเลือก slot -------
     const handleSlotClick = (value) => {
         setSelectedSlot(value);
+    };
+
+    // ------- เปิด Drawer สำหรับสร้าง Booking ใหม่ -------
+    const handleOpenCreateBooking = () => {
+        if (isSlotFull) {
+            alert("ช่วงเวลานี้เต็มแล้ว (สูงสุด 4 คิวต่อช่วงเวลา)");
+            return;
+        }
+
+        const [startTime, endTime] = selectedSlot.split("-");
+
+        setDrawerDefaults({
+            date: selectedDate,
+            start_time: startTime,
+            end_time: endTime,
+            queue_no: nextQueueNo,
+            recorder: displayName || "",
+        });
+        setDrawerOpened(true);
     };
 
     const handleEdit = (queue) => {
         console.log("edit queue", queue);
     };
 
+    // ===== ฟังก์ชันลบจริง ๆ (ยิง API) =====
+    const deleteQueue = async (queue) => {
+        const id = getQueueId(queue);
+        if (!id) {
+            console.warn("[BookingQueuePage] delete: no id found", queue);
+            alert("ไม่พบ ID ของคิว ไม่สามารถลบได้");
+            return;
+        }
+
+        try {
+            setDeletingId(id);
+            console.log("[BookingQueuePage] DELETE /bookings/", id);
+            await http.delete(`/bookings/${id}`);
+            await fetchQueues();
+        } catch (err) {
+            console.error("[BookingQueuePage] delete error:", err);
+            alert("ลบคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    // ===== เปิด Confirm Modal ตอนกดลบ =====
     const handleDelete = (queue) => {
-        console.log("delete queue", queue);
+        const id = getQueueId(queue);
+        if (!id) {
+            alert("ไม่พบ ID ของคิว ไม่สามารถลบได้");
+            return;
+        }
+
+        modals.openConfirmModal({
+            title: "ยืนยันการลบคิว",
+            children: (
+                <Text size="sm">
+                    คุณต้องการลบคิวหมายเลข{" "}
+                    <b>{queue.queue_no ?? "-"}</b> ของ{" "}
+                    <b>{queue.name ?? "ไม่ทราบชื่อ"}</b> ใช่หรือไม่?
+                </Text>
+            ),
+            labels: { confirm: "ลบคิว", cancel: "ยกเลิก" },
+            confirmProps: { color: "red" },
+            centered: true,
+            onConfirm: () => {
+                deleteQueue(queue);
+            },
+        });
     };
 
     const handleTicket = (queue) => {
         console.log("ticket for", queue);
-    };
-
-    // เปิด Drawer + เตรียมค่า default
-    const openCreateDrawer = () => {
-        const { start, end } = parseSlot(selectedSlot);
-        const suggestedQueue =
-            queues.length > 0
-                ? (queues[queues.length - 1].queue_no || 0) + 1
-                : 1;
-        const initialDate = selectedDate || new Date();
-
-        setDrawerDefaults({
-            start_time: start,
-            end_time: end,
-            date: initialDate,
-            queue_no: suggestedQueue,
-            recorder: displayName || "",
-        });
-        setDrawerOpened(true);
-    };
-
-    const closeDrawer = () => {
-        setDrawerOpened(false);
-    };
-
-    const handleCreateSuccess = async () => {
-        setDrawerOpened(false);
-        await fetchQueues();
     };
 
     return (
@@ -252,16 +335,20 @@ export default function BookingQueuePage({
                                     <Text size="sm" c="dimmed">
                                         เลือกวันที่และช่วงเวลาเพื่อดูสถานะการจองคิวรถบรรทุก
                                     </Text>
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                        {displayRange} • {slotQueueRangeLabel}
+                                    </Text>
                                 </div>
 
                                 <Button
                                     leftSection={<IconCalendar size={16} />}
                                     radius="md"
                                     variant="filled"
-                                    color="indigo"
-                                    onClick={openCreateDrawer}
+                                    color={isSlotFull ? "gray" : "indigo"}
+                                    onClick={handleOpenCreateBooking}
+                                    disabled={isSlotFull}
                                 >
-                                    + เพิ่มการจอง
+                                    {isSlotFull ? "ช่วงเวลานี้เต็มแล้ว" : "+ เพิ่มการจอง"}
                                 </Button>
                             </Group>
 
@@ -333,6 +420,18 @@ export default function BookingQueuePage({
                                 <Badge size="sm" variant="light" color="gray">
                                     {displayDate}
                                 </Badge>
+                                <Badge size="sm" variant="light" color="blue">
+                                    คิวปัจจุบันในช่วงนี้: {queues.length}
+                                </Badge>
+                                {!slotConfig.limit ? (
+                                    <Badge size="sm" variant="light" color="teal">
+                                        ไม่จำกัดคิว
+                                    </Badge>
+                                ) : (
+                                    <Badge size="sm" variant="light" color="violet">
+                                        สูงสุด {slotConfig.limit} คิว
+                                    </Badge>
+                                )}
                                 {loading && (
                                     <Group gap={4}>
                                         <Loader size="xs" />
@@ -372,86 +471,106 @@ export default function BookingQueuePage({
                                     </Text>
                                 </Card>
                             ) : (
-                                <SimpleGrid
-                                    cols={{ base: 1, sm: 2, lg: 3 }}
-                                    spacing="md"
-                                >
-                                    {queues.map((q) => (
-                                        <Card
-                                            key={q.id}
-                                            radius="md"
-                                            withBorder
-                                            shadow="xs"
-                                            padding="md"
-                                            style={{ backgroundColor: "#ffffff" }}
-                                        >
-                                            <Stack gap={6}>
-                                                <Group justify="space-between" align="flex-start">
-                                                    <Stack gap={0} style={{ flex: 1 }}>
-                                                        <Text
-                                                            size="sm"
-                                                            fw={700}
-                                                            style={{
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.04em",
-                                                            }}
-                                                        >
-                                                            Queue : {q.queue_no}
+                                <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+                                    {queues.map((q) => {
+                                        const id = getQueueId(q);
+                                        const isDeleting = deletingId === id;
+
+                                        return (
+                                            <Card
+                                                key={id || q.id || q.booking_code}
+                                                radius="md"
+                                                withBorder
+                                                shadow="xs"
+                                                padding="md"
+                                                style={{ backgroundColor: "#ffffff" }}
+                                            >
+                                                <Stack gap={6}>
+                                                    {/* Header: Queue + edit/delete */}
+                                                    <Group
+                                                        justify="space-between"
+                                                        align="flex-start"
+                                                    >
+                                                        <Stack gap={0} style={{ flex: 1 }}>
+                                                            <Text
+                                                                size="sm"
+                                                                fw={700}
+                                                                style={{
+                                                                    textTransform: "uppercase",
+                                                                    letterSpacing: "0.04em",
+                                                                }}
+                                                            >
+                                                                Queue : {q.queue_no}
+                                                            </Text>
+                                                        </Stack>
+
+                                                        <Group gap={4}>
+                                                            <ActionIcon
+                                                                variant="subtle"
+                                                                color="gray"
+                                                                onClick={() => handleEdit(q)}
+                                                                disabled={isDeleting}
+                                                            >
+                                                                <IconPencil size={16} />
+                                                            </ActionIcon>
+                                                            <ActionIcon
+                                                                variant="subtle"
+                                                                color="red"
+                                                                onClick={() => handleDelete(q)}
+                                                                disabled={isDeleting}
+                                                            >
+                                                                {isDeleting ? (
+                                                                    <Loader size="xs" />
+                                                                ) : (
+                                                                    <IconTrash size={16} />
+                                                                )}
+                                                            </ActionIcon>
+                                                        </Group>
+                                                    </Group>
+
+                                                    {/* Details */}
+                                                    <Stack gap={2} mt="xs">
+                                                        <Text size="xs">
+                                                            <b>Code :</b> {q.code}
                                                         </Text>
-                                                        <Text size="xs" c="dimmed" fw={500}>
-                                                            Booking Code : {q.booking_code}
+                                                        <Text size="xs">
+                                                            <b>Name :</b> {q.name}
+                                                        </Text>
+                                                        <Text size="xs">
+                                                            <b>Truck :</b> {q.truck}
+                                                        </Text>
+                                                        <Text size="xs">
+                                                            <b>Type :</b> {q.type}
+                                                        </Text>
+                                                        <Text size="xs">
+                                                            <b>Recorder :</b> {q.recorder}
                                                         </Text>
                                                     </Stack>
 
-                                                    <Group gap={4}>
-                                                        <ActionIcon
-                                                            variant="subtle"
-                                                            color="gray"
-                                                            onClick={() => handleEdit(q)}
-                                                        >
-                                                            <IconPencil size={16} />
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                            variant="subtle"
-                                                            color="red"
-                                                            onClick={() => handleDelete(q)}
-                                                        >
-                                                            <IconTrash size={16} />
-                                                        </ActionIcon>
-                                                    </Group>
-                                                </Group>
-
-                                                <Stack gap={2} mt="xs">
-                                                    <Text size="xs">
-                                                        <b>Code :</b> {q.code}
-                                                    </Text>
-                                                    <Text size="xs">
-                                                        <b>Name :</b> {q.name}
-                                                    </Text>
-                                                    <Text size="xs">
-                                                        <b>Truck :</b> {q.truck}
-                                                    </Text>
-                                                    <Text size="xs">
-                                                        <b>Type :</b> {q.type}
-                                                    </Text>
-                                                    <Text size="xs">
-                                                        <b>Recorder :</b> {q.recorder}
-                                                    </Text>
-                                                </Stack>
-
-                                                <Group justify="flex-end" mt="sm">
-                                                    <Button
-                                                        size="xs"
-                                                        variant="light"
-                                                        leftSection={<IconTicket size={14} />}
-                                                        onClick={() => handleTicket(q)}
+                                                    {/* Booking Code + Ticket button (บรรทัดเดียวกัน) */}
+                                                    <Group
+                                                        justify="space-between"
+                                                        align="center"
+                                                        mt="sm"
                                                     >
-                                                        Ticket
-                                                    </Button>
-                                                </Group>
-                                            </Stack>
-                                        </Card>
-                                    ))}
+                                                        <Text size="xs" c="dimmed" fw={500}>
+                                                            Booking Code : {q.booking_code}
+                                                        </Text>
+
+                                                        <Button
+                                                            size="xs"
+                                                            variant="light"
+                                                            leftSection={<IconTicket size={14} />}
+                                                            onClick={() => handleTicket(q)}
+                                                            disabled={isDeleting}
+                                                        >
+                                                            Ticket
+                                                        </Button>
+                                                    </Group>
+                                                </Stack>
+                                            </Card>
+                                        );
+                                    })}
                                 </SimpleGrid>
                             )}
 
@@ -465,12 +584,15 @@ export default function BookingQueuePage({
                 </AppShell.Main>
             </AppShell>
 
-            {/* Drawer ที่แยกออกมาเป็น component */}
+            {/* Drawer สำหรับ Add Booking */}
             <AddBookingDrawer
                 opened={drawerOpened}
-                onClose={closeDrawer}
+                onClose={() => setDrawerOpened(false)}
                 defaults={drawerDefaults}
-                onSuccess={handleCreateSuccess}
+                onSuccess={async () => {
+                    setDrawerOpened(false);
+                    await fetchQueues();
+                }}
             />
         </div>
     );
