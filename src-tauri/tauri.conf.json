@@ -37,6 +37,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -44,15 +45,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+
     "publisher": "Y.T Rubber Co., Ltd.",
     "category": "Productivity",
     "shortDescription": "YTRC Portal Center Desktop Application",
     "longDescription": "Internal portal for YTRC staff to manage suppliers, bookings, truck receiving, and other master data.",
     "copyright": "Copyright © 2025",
+
     "windows": {
-      "certificateThumbprint": "PUT_YOUR_CERT_THUMBPRINT_HERE",
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.digicert.com"
+      "digestAlgorithm": "sha256"
     }
   },
 
@@ -61,7 +62,7 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBNjJGMUZERDJDMjlCN0IKUldSN204TFMvZkZpZWk2ZUNZeXBZeWg0aytjZ2lneTRIZStxNnRVRGRqcU1uWCtsTmJCTzYyZXoK",
       "endpoints": [
-        "https://database-system.ytrc.co.th/updates/ytrc-portal-center/latest.json"
+        "https://database-system.ytrc.co.th/desktop-updates/ytrc-portal-center/latest.json"
       ],
       "windows": {
         "installMode": "passive"
