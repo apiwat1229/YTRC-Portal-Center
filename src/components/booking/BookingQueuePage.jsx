@@ -30,6 +30,7 @@ import {
 import { http } from "@/helpers/http";
 import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
+import AddBookingDrawer from "./AddBookingDrawer";
 
 // ===== config slot เวลาให้เหมือน BE =====
 const SLOT_OPTIONS = [
@@ -44,6 +45,14 @@ const SLOT_OPTIONS = [
 function formatSlotLabel(value) {
     const found = SLOT_OPTIONS.find((s) => s.value === value);
     return found ? found.label : value;
+}
+
+function parseSlot(value) {
+    if (!value || !value.includes("-")) {
+        return { start: "08:00", end: "09:00" };
+    }
+    const [start, end] = value.split("-");
+    return { start, end };
 }
 
 export default function BookingQueuePage({
@@ -61,6 +70,10 @@ export default function BookingQueuePage({
     const [queues, setQueues] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    // Drawer state ที่ใช้ร่วมกับ component AddBookingDrawer
+    const [drawerOpened, setDrawerOpened] = useState(false);
+    const [drawerDefaults, setDrawerDefaults] = useState(null);
 
     // ===== ชื่อใน header ขวาบน =====
     const displayName = useMemo(() => {
@@ -95,7 +108,6 @@ export default function BookingQueuePage({
 
             const dateParam = dayjs(selectedDate).format("YYYY-MM-DD");
 
-            // BE parse_slot รองรับทั้ง "08:00-09:00" และ "08:00 - 09:00"
             const resp = await http.get("/bookings/queues", {
                 params: {
                     date: dateParam,
@@ -118,25 +130,48 @@ export default function BookingQueuePage({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDate, selectedSlot]);
 
-    // ------- handler เวลาเลือก slot -------
     const handleSlotClick = (value) => {
         setSelectedSlot(value);
     };
 
-    // ------- placeholder action ปุ่มต่าง ๆ -------
     const handleEdit = (queue) => {
-        // TODO: เปิด modal แก้ไขคิว
         console.log("edit queue", queue);
     };
 
     const handleDelete = (queue) => {
-        // TODO: เปิด confirm แล้ว call DELETE /bookings/{id}
         console.log("delete queue", queue);
     };
 
     const handleTicket = (queue) => {
-        // TODO: ไปหน้า ticket / เปิดหน้าปริ๊นบัตรคิว
         console.log("ticket for", queue);
+    };
+
+    // เปิด Drawer + เตรียมค่า default
+    const openCreateDrawer = () => {
+        const { start, end } = parseSlot(selectedSlot);
+        const suggestedQueue =
+            queues.length > 0
+                ? (queues[queues.length - 1].queue_no || 0) + 1
+                : 1;
+        const initialDate = selectedDate || new Date();
+
+        setDrawerDefaults({
+            start_time: start,
+            end_time: end,
+            date: initialDate,
+            queue_no: suggestedQueue,
+            recorder: displayName || "",
+        });
+        setDrawerOpened(true);
+    };
+
+    const closeDrawer = () => {
+        setDrawerOpened(false);
+    };
+
+    const handleCreateSuccess = async () => {
+        setDrawerOpened(false);
+        await fetchQueues();
     };
 
     return (
@@ -156,9 +191,8 @@ export default function BookingQueuePage({
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
-                            {/* ============= HEADER (เหมือน StarterPage แต่เปลี่ยนชื่อ) ============= */}
+                            {/* ============= HEADER ============= */}
                             <Group justify="space-between" align="center">
-                                {/* Hero Title */}
                                 <Group gap="md">
                                     <ThemeIcon
                                         size={48}
@@ -196,7 +230,6 @@ export default function BookingQueuePage({
                                     </div>
                                 </Group>
 
-                                {/* Header ขวา: เวลา + ชื่อ + ปุ่ม Back / แจ้งเตือน / Logout */}
                                 <UserHeaderPanel
                                     user={user}
                                     displayName={displayName}
@@ -207,17 +240,12 @@ export default function BookingQueuePage({
                                 />
                             </Group>
 
-                            {/* ============= MAIN CONTENT (ของ Booking เดิม) ============= */}
-
-                            {/* Top bar: Title + ปุ่ม เพิ่มการจอง */}
+                            {/* ============= MAIN CONTENT ============= */}
                             <Group justify="space-between" align="flex-end">
                                 <div>
                                     <Title
                                         order={3}
-                                        style={{
-                                            letterSpacing: "-0.4px",
-                                            marginBottom: 4,
-                                        }}
+                                        style={{ letterSpacing: "-0.4px", marginBottom: 4 }}
                                     >
                                         Queue Overview
                                     </Title>
@@ -228,22 +256,19 @@ export default function BookingQueuePage({
 
                                 <Button
                                     leftSection={<IconCalendar size={16} />}
-                                    radius="xl"
+                                    radius="md"
                                     variant="filled"
                                     color="indigo"
-                                    onClick={() => {
-                                        // TODO: เปิด modal สร้าง booking ใหม่
-                                        console.log("open create booking");
-                                    }}
+                                    onClick={openCreateDrawer}
                                 >
                                     + เพิ่มการจอง
                                 </Button>
                             </Group>
 
-                            {/* ================= FILTER BAR ================= */}
+                            {/* FILTER BAR */}
                             <Paper
                                 shadow="xs"
-                                radius="lg"
+                                radius="md"
                                 p="md"
                                 withBorder
                                 style={{ backgroundColor: "#ffffff" }}
@@ -256,22 +281,14 @@ export default function BookingQueuePage({
                                 >
                                     {/* Date picker */}
                                     <Group gap="xs" align="center">
-                                        <Text
-                                            size="sm"
-                                            fw={600}
-                                            style={{ minWidth: 70 }}
-                                        >
+                                        <Text size="sm" fw={600} style={{ minWidth: 70 }}>
                                             เลือกวันที่
                                         </Text>
                                         <DateInput
                                             value={selectedDate}
-                                            onChange={(value) =>
-                                                value && setSelectedDate(value)
-                                            }
+                                            onChange={(value) => value && setSelectedDate(value)}
                                             valueFormat="DD-MMM-YYYY"
-                                            leftSection={
-                                                <IconCalendar size={16} />
-                                            }
+                                            leftSection={<IconCalendar size={16} />}
                                             styles={{
                                                 input: {
                                                     fontSize: 14,
@@ -292,23 +309,13 @@ export default function BookingQueuePage({
                                                     key={slot.value}
                                                     size="xs"
                                                     variant={
-                                                        selectedSlot ===
-                                                            slot.value
-                                                            ? "filled"
-                                                            : "light"
+                                                        selectedSlot === slot.value ? "filled" : "light"
                                                     }
                                                     color={
-                                                        selectedSlot ===
-                                                            slot.value
-                                                            ? "indigo"
-                                                            : "gray"
+                                                        selectedSlot === slot.value ? "indigo" : "gray"
                                                     }
-                                                    radius="xl"
-                                                    onClick={() =>
-                                                        handleSlotClick(
-                                                            slot.value,
-                                                        )
-                                                    }
+                                                    radius="md"
+                                                    onClick={() => handleSlotClick(slot.value)}
                                                 >
                                                     {slot.label}
                                                 </Button>
@@ -318,7 +325,7 @@ export default function BookingQueuePage({
                                 </Group>
                             </Paper>
 
-                            {/* ================= RESULT HEADER ================= */}
+                            {/* RESULT HEADER */}
                             <Group gap="xs">
                                 <Text size="sm" fw={600}>
                                     รายการจอง {displayRange}
@@ -336,7 +343,7 @@ export default function BookingQueuePage({
                                 )}
                             </Group>
 
-                            {/* ================= ERROR ================= */}
+                            {/* ERROR */}
                             {error && (
                                 <Paper
                                     p="sm"
@@ -352,11 +359,11 @@ export default function BookingQueuePage({
                                 </Paper>
                             )}
 
-                            {/* ================= QUEUE CARDS ================= */}
+                            {/* QUEUE CARDS */}
                             {queues.length === 0 && !loading ? (
                                 <Card
                                     shadow="xs"
-                                    radius="lg"
+                                    radius="md"
                                     withBorder
                                     style={{ backgroundColor: "#ffffff" }}
                                 >
@@ -372,45 +379,27 @@ export default function BookingQueuePage({
                                     {queues.map((q) => (
                                         <Card
                                             key={q.id}
-                                            radius="lg"
+                                            radius="md"
                                             withBorder
                                             shadow="xs"
                                             padding="md"
-                                            style={{
-                                                backgroundColor: "#ffffff",
-                                            }}
+                                            style={{ backgroundColor: "#ffffff" }}
                                         >
                                             <Stack gap={6}>
-                                                {/* Header card */}
-                                                <Group
-                                                    justify="space-between"
-                                                    align="flex-start"
-                                                >
-                                                    <Stack
-                                                        gap={0}
-                                                        style={{ flex: 1 }}
-                                                    >
+                                                <Group justify="space-between" align="flex-start">
+                                                    <Stack gap={0} style={{ flex: 1 }}>
                                                         <Text
                                                             size="sm"
                                                             fw={700}
                                                             style={{
-                                                                textTransform:
-                                                                    "uppercase",
-                                                                letterSpacing:
-                                                                    "0.04em",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.04em",
                                                             }}
                                                         >
                                                             Queue : {q.queue_no}
                                                         </Text>
-                                                        <Text
-                                                            size="xs"
-                                                            c="dimmed"
-                                                            fw={500}
-                                                        >
-                                                            Booking Code :{" "}
-                                                            {
-                                                                q.booking_code
-                                                            }
+                                                        <Text size="xs" c="dimmed" fw={500}>
+                                                            Booking Code : {q.booking_code}
                                                         </Text>
                                                     </Stack>
 
@@ -418,24 +407,16 @@ export default function BookingQueuePage({
                                                         <ActionIcon
                                                             variant="subtle"
                                                             color="gray"
-                                                            onClick={() =>
-                                                                handleEdit(q)
-                                                            }
+                                                            onClick={() => handleEdit(q)}
                                                         >
-                                                            <IconPencil
-                                                                size={16}
-                                                            />
+                                                            <IconPencil size={16} />
                                                         </ActionIcon>
                                                         <ActionIcon
                                                             variant="subtle"
                                                             color="red"
-                                                            onClick={() =>
-                                                                handleDelete(q)
-                                                            }
+                                                            onClick={() => handleDelete(q)}
                                                         >
-                                                            <IconTrash
-                                                                size={16}
-                                                            />
+                                                            <IconTrash size={16} />
                                                         </ActionIcon>
                                                     </Group>
                                                 </Group>
@@ -448,33 +429,22 @@ export default function BookingQueuePage({
                                                         <b>Name :</b> {q.name}
                                                     </Text>
                                                     <Text size="xs">
-                                                        <b>Truck :</b>{" "}
-                                                        {q.truck}
+                                                        <b>Truck :</b> {q.truck}
                                                     </Text>
                                                     <Text size="xs">
                                                         <b>Type :</b> {q.type}
                                                     </Text>
                                                     <Text size="xs">
-                                                        <b>Recorder :</b>{" "}
-                                                        {q.recorder}
+                                                        <b>Recorder :</b> {q.recorder}
                                                     </Text>
                                                 </Stack>
 
-                                                <Group
-                                                    justify="flex-end"
-                                                    mt="sm"
-                                                >
+                                                <Group justify="flex-end" mt="sm">
                                                     <Button
                                                         size="xs"
                                                         variant="light"
-                                                        leftSection={
-                                                            <IconTicket
-                                                                size={14}
-                                                            />
-                                                        }
-                                                        onClick={() =>
-                                                            handleTicket(q)
-                                                        }
+                                                        leftSection={<IconTicket size={14} />}
+                                                        onClick={() => handleTicket(q)}
                                                     >
                                                         Ticket
                                                     </Button>
@@ -485,7 +455,6 @@ export default function BookingQueuePage({
                                 </SimpleGrid>
                             )}
 
-                            {/* ================= FOOTER ================= */}
                             <StatusFooterBar
                                 statusLabel="Service Online"
                                 version="v0.1.0"
@@ -495,6 +464,14 @@ export default function BookingQueuePage({
                     </Container>
                 </AppShell.Main>
             </AppShell>
+
+            {/* Drawer ที่แยกออกมาเป็น component */}
+            <AddBookingDrawer
+                opened={drawerOpened}
+                onClose={closeDrawer}
+                defaults={drawerDefaults}
+                onSuccess={handleCreateSuccess}
+            />
         </div>
     );
 }
