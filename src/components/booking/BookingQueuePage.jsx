@@ -75,6 +75,38 @@ function getQueueId(q) {
     return q?.id || q?._id || q?.booking_id || null;
 }
 
+// ====== ฟังก์ชันคำนวณคิวถัดไปแบบเติมช่องว่าง ======
+function computeNextQueueNo(queues, slotConfig) {
+    const start = slotConfig.start ?? 1;
+    const limit = slotConfig.limit;
+
+    // ดึงเฉพาะเลขคิวที่เป็นตัวเลข และ >= start
+    const existingNumbers = queues
+        .map((q) => Number(q.queue_no))
+        .filter((n) => Number.isFinite(n) && n >= start);
+
+    const used = new Set(existingNumbers);
+
+    // slot แบบจำกัดจำนวน
+    if (limit != null) {
+        const end = start + limit - 1;
+        for (let n = start; n <= end; n++) {
+            if (!used.has(n)) {
+                return n; // เจอช่องว่างตัวแรก
+            }
+        }
+        // ถ้าไม่เหลือช่องว่างเลย แปลว่าเต็ม
+        return null;
+    }
+
+    // slot แบบไม่จำกัด (14:00-15:00) → หาเลขว่างจาก start ขึ้นไปเรื่อย ๆ
+    let candidate = start;
+    while (used.has(candidate)) {
+        candidate += 1;
+    }
+    return candidate;
+}
+
 export default function BookingQueuePage({
     auth,
     onLogout,
@@ -121,21 +153,22 @@ export default function BookingQueuePage({
 
     const effectiveNotificationsCount = notificationsCount;
 
-    // ===== คำนวณคิวตาม slot & จำนวนคิวใน slot ปัจจุบัน =====
+    // ===== คำนวณคิวตาม slot =====
     const slotConfig = useMemo(
         () => getSlotConfig(selectedSlot),
         [selectedSlot],
     );
 
+    const nextQueueNo = useMemo(
+        () => computeNextQueueNo(queues, slotConfig),
+        [queues, slotConfig],
+    );
+
     const isSlotFull = useMemo(() => {
         if (!slotConfig.limit) return false; // ไม่จำกัด
-        return queues.length >= slotConfig.limit;
-    }, [slotConfig, queues]);
-
-    const nextQueueNo = useMemo(
-        () => slotConfig.start + queues.length, // start + จำนวนที่มีอยู่
-        [slotConfig, queues],
-    );
+        // ถ้าไม่มีคิวว่างให้จองแล้ว = เต็ม
+        return nextQueueNo === null;
+    }, [slotConfig, nextQueueNo]);
 
     const slotQueueRangeLabel = useMemo(() => {
         if (!slotConfig.limit) {
@@ -184,7 +217,8 @@ export default function BookingQueuePage({
 
     // ------- เปิด Drawer สำหรับสร้าง Booking ใหม่ -------
     const handleOpenCreateBooking = () => {
-        if (isSlotFull) {
+        // ถ้าเต็มแล้ว ห้ามเปิด
+        if (isSlotFull || nextQueueNo == null) {
             alert("ช่วงเวลานี้เต็มแล้ว (สูงสุด 4 คิวต่อช่วงเวลา)");
             return;
         }
@@ -195,7 +229,7 @@ export default function BookingQueuePage({
             date: selectedDate,
             start_time: startTime,
             end_time: endTime,
-            queue_no: nextQueueNo,
+            queue_no: nextQueueNo, // ⭐ ใช้คิวว่างตัวแรก
             recorder: displayName || "",
         });
         setDrawerOpened(true);
@@ -239,8 +273,7 @@ export default function BookingQueuePage({
             title: "ยืนยันการลบคิว",
             children: (
                 <Text size="sm">
-                    คุณต้องการลบคิวหมายเลข{" "}
-                    <b>{queue.queue_no ?? "-"}</b> ของ{" "}
+                    คุณต้องการลบคิวหมายเลข <b>{queue.queue_no ?? "-"}</b> ของ{" "}
                     <b>{queue.name ?? "ไม่ทราบชื่อ"}</b> ใช่หรือไม่?
                 </Text>
             ),
@@ -346,7 +379,7 @@ export default function BookingQueuePage({
                                     variant="filled"
                                     color={isSlotFull ? "gray" : "indigo"}
                                     onClick={handleOpenCreateBooking}
-                                    disabled={isSlotFull}
+                                    disabled={isSlotFull || nextQueueNo == null}
                                 >
                                     {isSlotFull ? "ช่วงเวลานี้เต็มแล้ว" : "+ เพิ่มการจอง"}
                                 </Button>
@@ -547,7 +580,7 @@ export default function BookingQueuePage({
                                                         </Text>
                                                     </Stack>
 
-                                                    {/* Booking Code + Ticket button (บรรทัดเดียวกัน) */}
+                                                    {/* Booking Code + Ticket button */}
                                                     <Group
                                                         justify="space-between"
                                                         align="center"
