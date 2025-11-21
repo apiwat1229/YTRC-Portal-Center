@@ -18,7 +18,7 @@ import {
     ThemeIcon,
     Title,
 } from "@mantine/core";
-import { DateInput } from "@mantine/dates";
+import { DatePickerInput } from "@mantine/dates";
 import {
     IconActivity,
     IconCalendar,
@@ -254,7 +254,7 @@ export default function BookingQueuePage({
                                     wrap="wrap"
                                     gap="md"
                                 >
-                                    {/* Date picker */}
+                                    {/* Date picker (ใช้ Mantine DatePickerInput) */}
                                     <Group gap="xs" align="center">
                                         <Text
                                             size="sm"
@@ -263,11 +263,14 @@ export default function BookingQueuePage({
                                         >
                                             เลือกวันที่
                                         </Text>
-                                        <DateInput
+                                        <DatePickerInput
                                             value={selectedDate}
-                                            onChange={(value) =>
-                                                value && setSelectedDate(value)
-                                            }
+                                            onChange={(value) => {
+                                                // value = Date | null
+                                                if (value) {
+                                                    setSelectedDate(value);
+                                                }
+                                            }}
                                             valueFormat="DD-MMM-YYYY"
                                             leftSection={
                                                 <IconCalendar size={16} />
@@ -277,6 +280,9 @@ export default function BookingQueuePage({
                                                     fontSize: 14,
                                                     width: 220,
                                                 },
+                                            }}
+                                            popoverProps={{
+                                                withinPortal: true,
                                             }}
                                         />
                                     </Group>
