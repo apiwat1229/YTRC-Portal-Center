@@ -65,7 +65,8 @@
         "https://database-system.ytrc.co.th/desktop-updates/ytrc-portal-center/latest.json"
       ],
       "windows": {
-        "installMode": "passive"
+        "installMode": "passive",
+        "devtools": true
       }
     }
   }
