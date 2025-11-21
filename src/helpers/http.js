@@ -8,10 +8,12 @@ import {
     setRefreshToken,
 } from "./tokenStorage";
 
-// 🌟 FIX: fallback เป็น production API เสมอ
+// รองรับทั้ง VITE_TAURI_API_BASE_URL, VITE_API_BASE_URL, VITE_API_BASE
+// และ fallback ไปที่ production API เสมอ
 const API_BASE =
     import.meta.env.VITE_TAURI_API_BASE_URL ||
     import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_BASE ||
     "https://database-system.ytrc.co.th/api";
 
 console.log("[HTTP] API_BASE =", API_BASE);
@@ -53,10 +55,12 @@ http.interceptors.response.use(
     async (error) => {
         const original = error.config;
 
+        // ถ้าเป็น network error จริง ๆ (server ไม่ตอบ / TLS / DNS) → โยนต่อเลย
         if (!error.response) {
             return Promise.reject(error);
         }
 
+        // ถ้าไม่ใช่ 401 หรือเคย retry ไปแล้ว → โยนต่อ
         if (error.response.status !== 401 || original._retry) {
             return Promise.reject(error);
         }
@@ -66,10 +70,15 @@ http.interceptors.response.use(
         const currentRefresh = getRefreshToken();
         if (!currentRefresh) {
             clearTokens();
-            window.location.href = "/login";
+            try {
+                window.location.href = "/login";
+            } catch {
+                // ignore
+            }
             return Promise.reject(error);
         }
 
+        // ถ้ามีการ refresh อยู่แล้ว → รอคิว
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
@@ -80,7 +89,7 @@ http.interceptors.response.use(
                     }
                     return http(original);
                 })
-                .catch(Promise.reject);
+                .catch((err) => Promise.reject(err));
         }
 
         isRefreshing = true;
@@ -100,6 +109,7 @@ http.interceptors.response.use(
 
             setAccessToken(newAccess);
             setRefreshToken(newRefresh);
+
             http.defaults.headers.Authorization = `Bearer ${newAccess}`;
 
             processQueue(null, newAccess);
@@ -111,7 +121,11 @@ http.interceptors.response.use(
 
             processQueue(refreshErr, null);
             clearTokens();
-            window.location.href = "/login";
+            try {
+                window.location.href = "/login";
+            } catch {
+                // ignore
+            }
 
             return Promise.reject(refreshErr);
         } finally {
