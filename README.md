@@ -162,3 +162,20 @@ YTRC Infrastructure & Digital Transformation
 
 This project is proprietary and internal to **YTRC**.\
 Unauthorized distribution is prohibited.
+
+
+ขั้นตอนต่อไปเวลาจะ build release (macOS / Windows)
+
+ก่อนสั่ง npm run tauri build ให้ตั้ง env แบบนี้ (บน macOS / Linux):
+
+export TAURI_SIGNING_PRIVATE_KEY="$(cat src-tauri/keys/tauri.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="รหัสผ่านตอน generate"
+npm run tauri build
+
+
+
+บน Windows (PowerShell):
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content .\src-tauri\keys\tauri.key -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "รหัสผ่านตอน-generate"
+npm run tauri build
+

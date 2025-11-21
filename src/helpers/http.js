@@ -8,10 +8,11 @@ import {
     setRefreshToken,
 } from "./tokenStorage";
 
+// 🌟 FIX: fallback เป็น production API เสมอ
 const API_BASE =
     import.meta.env.VITE_TAURI_API_BASE_URL ||
     import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8110/api";
+    "https://database-system.ytrc.co.th/api";
 
 console.log("[HTTP] API_BASE =", API_BASE);
 
@@ -26,19 +27,16 @@ const processQueue = (error, token = null) => {
     failedQueue = [];
 };
 
-// ใช้ตัวนี้สำหรับทุก request ที่ต้อง login
 export const http = axios.create({
     baseURL: API_BASE,
-    withCredentials: false, // ❗ เราไม่ใช้ cookie แล้ว
+    withCredentials: false,
 });
 
-// ใช้ตัวนี้สำหรับ public / auth endpoint เช่น /auth/login, /auth/refresh
 export const httpPlain = axios.create({
     baseURL: API_BASE,
-    withCredentials: false, // ❗ เช่นกัน
+    withCredentials: false,
 });
 
-// ---------- Request Interceptor: แนบ access token ----------
 http.interceptors.request.use(
     (config) => {
         const token = getAccessToken();
@@ -50,18 +48,15 @@ http.interceptors.request.use(
     (error) => Promise.reject(error),
 );
 
-// ---------- Response Interceptor: ถ้า 401 → refresh token ----------
 http.interceptors.response.use(
     (response) => response,
     async (error) => {
         const original = error.config;
 
         if (!error.response) {
-            // network error จริง ๆ (server ไม่ตอบ, DNS, TLS ฯลฯ)
             return Promise.reject(error);
         }
 
-        // ถ้าไม่ใช่ 401 หรือเคย retry ไปแล้ว
         if (error.response.status !== 401 || original._retry) {
             return Promise.reject(error);
         }
@@ -70,18 +65,12 @@ http.interceptors.response.use(
 
         const currentRefresh = getRefreshToken();
         if (!currentRefresh) {
-            // ไม่มี refresh token ให้ใช้แล้ว → เคลียร์ session
             clearTokens();
-            try {
-                window.location.href = "/login";
-            } catch {
-                // ignore
-            }
+            window.location.href = "/login";
             return Promise.reject(error);
         }
 
         if (isRefreshing) {
-            // มีการ refresh อยู่แล้ว → รอคิว
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
             })
@@ -91,15 +80,13 @@ http.interceptors.response.use(
                     }
                     return http(original);
                 })
-                .catch((err) => Promise.reject(err));
+                .catch(Promise.reject);
         }
 
         isRefreshing = true;
 
         try {
-            console.log("[HTTP] 401 → calling /auth/refresh ...");
-
-            // 🔑 ส่ง refresh_token ตาม schema ใน BE
+            console.log("[HTTP] 401 → refresh ...");
             const res = await httpPlain.post("/auth/refresh", {
                 refresh_token: currentRefresh,
             });
@@ -110,8 +97,6 @@ http.interceptors.response.use(
             if (!newAccess || !newRefresh) {
                 throw new Error("No tokens from refresh");
             }
-
-            console.log("[HTTP] refresh ok, update access & refresh token");
 
             setAccessToken(newAccess);
             setRefreshToken(newRefresh);
@@ -126,12 +111,7 @@ http.interceptors.response.use(
 
             processQueue(refreshErr, null);
             clearTokens();
-
-            try {
-                window.location.href = "/login";
-            } catch {
-                // ignore
-            }
+            window.location.href = "/login";
 
             return Promise.reject(refreshErr);
         } finally {
