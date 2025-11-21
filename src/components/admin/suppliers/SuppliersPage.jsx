@@ -1,4 +1,3 @@
-// src/components/admin/suppliers/SuppliersPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,6 +12,7 @@ import {
     Group,
     Pagination,
     Select,
+    SimpleGrid,
     Stack,
     Text,
     TextInput,
@@ -116,10 +116,16 @@ export default function SuppliersPage({ auth, onLogout }) {
                     {},
                     auth
                 );
-                setAllSuppliers(Array.isArray(supplierData) ? supplierData : []);
+                setAllSuppliers(
+                    Array.isArray(supplierData) ? supplierData : []
+                );
 
                 // rubber types (ใช้สำหรับ map ชื่อ + filter)
-                const rt = await apiRequest(`/rubber-types?limit=200`, {}, auth);
+                const rt = await apiRequest(
+                    `/rubber-types?limit=200`,
+                    {},
+                    auth
+                );
                 if (Array.isArray(rt)) {
                     const map = {};
                     rt.forEach((r) => {
@@ -225,7 +231,11 @@ export default function SuppliersPage({ auth, onLogout }) {
             if (addressFilter) {
                 const a = s.address || {};
                 const province =
-                    a.province_th || a.province_en || a.province || a.changwat || "";
+                    a.province_th ||
+                    a.province_en ||
+                    a.province ||
+                    a.changwat ||
+                    "";
                 if (
                     String(province).toLowerCase() !==
                     String(addressFilter).toLowerCase()
@@ -294,6 +304,23 @@ export default function SuppliersPage({ auth, onLogout }) {
         rubberTypesMap,
     ]);
 
+    // ===== Stats (รวมทุก supplier ไม่ใช่แค่ filtered) =====
+    const supplierStats = useMemo(() => {
+        const total = allSuppliers.length;
+        let active = 0;
+        let inactive = 0;
+        let suspended = 0;
+
+        allSuppliers.forEach((s) => {
+            const st = String(s.status || "").toLowerCase();
+            if (st === "active") active += 1;
+            else if (st === "inactive") inactive += 1;
+            else if (st === "suspended") suspended += 1;
+        });
+
+        return { total, active, inactive, suspended };
+    }, [allSuppliers]);
+
     // reset page เมื่อ filter เปลี่ยน
     useEffect(() => {
         setPage(1);
@@ -310,10 +337,27 @@ export default function SuppliersPage({ auth, onLogout }) {
             ? 0
             : Math.min(currentPage * pageSize, filteredSuppliers.length);
 
+    // ===== Sort โดย Code จากมากไปน้อย แล้วค่อย slice ตาม page =====
     const pageItems = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
-        return filteredSuppliers.slice(start, end);
+
+        const codeNum = (val) => {
+            if (!val) return 0;
+            const numStr = String(val).replace(/\D/g, "");
+            const n = parseInt(numStr || "0", 10);
+            return Number.isNaN(n) ? 0 : n;
+        };
+
+        const sorted = [...filteredSuppliers].sort((a, b) => {
+            const na = codeNum(a.code);
+            const nb = codeNum(b.code);
+            if (na !== nb) return nb - na; // มากไปน้อย
+            // fallback: เปรียบเทียบแบบ string
+            return String(b.code || "").localeCompare(String(a.code || ""));
+        });
+
+        return sorted.slice(start, end);
     }, [filteredSuppliers, currentPage, pageSize]);
 
     // ===== ถ้าไม่มีสิทธิ์ view =====
@@ -390,7 +434,8 @@ export default function SuppliersPage({ auth, onLogout }) {
                                 <Card withBorder radius="md" shadow="xs">
                                     <Stack gap="sm" align="center">
                                         <Title order={4}>
-                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล Suppliers
+                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล
+                                            Suppliers
                                         </Title>
                                         <Text size="sm" c="dimmed" ta="center">
                                             กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
@@ -497,10 +542,10 @@ export default function SuppliersPage({ auth, onLogout }) {
                                 radius="md"
                                 shadow="xs"
                                 p="md"
-                                pt="sm"   // ⬅ ทำให้หัวข้อชิดขอบบนมากขึ้น
+                                pt="sm" // ทำให้หัวข้อชิดขอบบนมากขึ้น
                             >
                                 <Stack gap="xs">
-                                    {/* Title block + filters อยู่บนสุดของ Card */}
+                                    {/* Title block + filters */}
                                     <Group
                                         justify="space-between"
                                         align="flex-start"
@@ -532,7 +577,11 @@ export default function SuppliersPage({ auth, onLogout }) {
                                         </Box>
 
                                         {/* Right: filters + New button */}
-                                        <Group gap="xs" wrap="wrap" align="flex-end">
+                                        <Group
+                                            gap="xs"
+                                            wrap="wrap"
+                                            align="flex-end"
+                                        >
                                             {/* Global search */}
                                             <TextInput
                                                 placeholder="ค้นหาด้วยชื่อ, code, phone, email, address, rubber type"
@@ -604,6 +653,214 @@ export default function SuppliersPage({ auth, onLogout }) {
 
                                     <Divider my="xs" />
 
+                                    {/* ===== Stats Grid: แสดงผลก่อนตาราง ===== */}
+                                    <Box mb="xs">
+                                        <SimpleGrid
+                                            cols={{ base: 1, sm: 2, lg: 4 }}
+                                            spacing="xs"
+                                        >
+                                            {/* Total */}
+                                            <Box
+                                                style={{
+                                                    borderRadius: 8,
+                                                    border: "1px solid rgba(226,232,240,1)",
+                                                    padding: 10,
+                                                    background:
+                                                        "linear-gradient(135deg, rgba(248,250,252,0.9), rgba(241,245,249,0.9))",
+                                                }}
+                                            >
+                                                <Group
+                                                    justify="space-between"
+                                                    align="center"
+                                                    mb={4}
+                                                >
+                                                    <Text
+                                                        size="xs"
+                                                        c="dimmed"
+                                                        fw={500}
+                                                    >
+                                                        Total Suppliers
+                                                    </Text>
+                                                    <ThemeIcon
+                                                        size={26}
+                                                        radius="xl"
+                                                        variant="light"
+                                                        color="blue"
+                                                    >
+                                                        <IconActivity
+                                                            size={16}
+                                                        />
+                                                    </ThemeIcon>
+                                                </Group>
+                                                <Text
+                                                    size="lg"
+                                                    fw={700}
+                                                    style={{
+                                                        letterSpacing: "-0.02em",
+                                                    }}
+                                                >
+                                                    {supplierStats.total}
+                                                </Text>
+                                                <Text
+                                                    size="xs"
+                                                    c="dimmed"
+                                                    mt={2}
+                                                >
+                                                    ข้อมูลทั้งหมดในระบบ
+                                                </Text>
+                                            </Box>
+
+                                            {/* Active */}
+                                            <Box
+                                                style={{
+                                                    borderRadius: 8,
+                                                    border: "1px solid rgba(220,252,231,1)",
+                                                    padding: 10,
+                                                    background:
+                                                        "linear-gradient(135deg, rgba(236,253,245,0.95), rgba(220,252,231,0.95))",
+                                                }}
+                                            >
+                                                <Group
+                                                    justify="space-between"
+                                                    align="center"
+                                                    mb={4}
+                                                >
+                                                    <Text
+                                                        size="xs"
+                                                        c="green.8"
+                                                        fw={600}
+                                                    >
+                                                        Active
+                                                    </Text>
+                                                    <ThemeIcon
+                                                        size={26}
+                                                        radius="xl"
+                                                        variant="light"
+                                                        color="green"
+                                                    >
+                                                        <IconCheck size={16} />
+                                                    </ThemeIcon>
+                                                </Group>
+                                                <Text
+                                                    size="lg"
+                                                    fw={700}
+                                                    style={{
+                                                        letterSpacing: "-0.02em",
+                                                    }}
+                                                >
+                                                    {supplierStats.active}
+                                                </Text>
+                                                <Text
+                                                    size="xs"
+                                                    c="green.9"
+                                                    mt={2}
+                                                >
+                                                    กำลังใช้งานในระบบคิว/รับซื้อ
+                                                </Text>
+                                            </Box>
+
+                                            {/* Inactive */}
+                                            <Box
+                                                style={{
+                                                    borderRadius: 8,
+                                                    border: "1px solid rgba(226,232,240,1)",
+                                                    padding: 10,
+                                                    background:
+                                                        "linear-gradient(135deg, rgba(248,250,252,0.96), rgba(229,231,235,0.96))",
+                                                }}
+                                            >
+                                                <Group
+                                                    justify="space-between"
+                                                    align="center"
+                                                    mb={4}
+                                                >
+                                                    <Text
+                                                        size="xs"
+                                                        c="gray.7"
+                                                        fw={500}
+                                                    >
+                                                        Inactive
+                                                    </Text>
+                                                    <ThemeIcon
+                                                        size={26}
+                                                        radius="xl"
+                                                        variant="light"
+                                                        color="gray"
+                                                    >
+                                                        <IconActivity
+                                                            size={16}
+                                                        />
+                                                    </ThemeIcon>
+                                                </Group>
+                                                <Text
+                                                    size="lg"
+                                                    fw={700}
+                                                    style={{
+                                                        letterSpacing: "-0.02em",
+                                                    }}
+                                                >
+                                                    {supplierStats.inactive}
+                                                </Text>
+                                                <Text
+                                                    size="xs"
+                                                    c="dimmed"
+                                                    mt={2}
+                                                >
+                                                    หยุดใช้งานชั่วคราว
+                                                </Text>
+                                            </Box>
+
+                                            {/* Suspended */}
+                                            <Box
+                                                style={{
+                                                    borderRadius: 8,
+                                                    border: "1px solid rgba(254,226,226,1)",
+                                                    padding: 10,
+                                                    background:
+                                                        "linear-gradient(135deg, rgba(254,242,242,0.96), rgba(254,226,226,0.96))",
+                                                }}
+                                            >
+                                                <Group
+                                                    justify="space-between"
+                                                    align="center"
+                                                    mb={4}
+                                                >
+                                                    <Text
+                                                        size="xs"
+                                                        c="red.8"
+                                                        fw={600}
+                                                    >
+                                                        Suspended
+                                                    </Text>
+                                                    <ThemeIcon
+                                                        size={26}
+                                                        radius="xl"
+                                                        variant="light"
+                                                        color="red"
+                                                    >
+                                                        <IconX size={16} />
+                                                    </ThemeIcon>
+                                                </Group>
+                                                <Text
+                                                    size="lg"
+                                                    fw={700}
+                                                    style={{
+                                                        letterSpacing: "-0.02em",
+                                                    }}
+                                                >
+                                                    {supplierStats.suspended}
+                                                </Text>
+                                                <Text
+                                                    size="xs"
+                                                    c="red.9"
+                                                    mt={2}
+                                                >
+                                                    ระงับการใช้งาน / blacklist
+                                                </Text>
+                                            </Box>
+                                        </SimpleGrid>
+                                    </Box>
+
                                     {/* TABLE */}
                                     <Box
                                         style={{
@@ -671,7 +928,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                             10
                                                         );
                                                         setPageSize(
-                                                            isNaN(val)
+                                                            Number.isNaN(val)
                                                                 ? 10
                                                                 : val
                                                         );

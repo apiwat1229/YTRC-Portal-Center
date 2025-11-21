@@ -1,4 +1,3 @@
-// src/components/admin/suppliers/SuppliersTable.jsx
 import {
     ActionIcon,
     Badge,
