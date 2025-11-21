@@ -12,6 +12,18 @@ import { IconPencil, IconTrash } from "@tabler/icons-react";
 
 const getId = (s) => s?.id || s?._id || s?.supplier_id || null;
 
+// ---- Helper: format phone xxx-xxx-xxxx ----
+function formatPhone(phone) {
+    if (!phone) return "-";
+    const digits = String(phone).replace(/\D/g, "");
+    if (digits.length === 10) {
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
+            6
+        )}`;
+    }
+    return phone;
+}
+
 function renderStatus(status) {
     const val = String(status || "").toLowerCase();
     let color = "green";
@@ -27,7 +39,15 @@ function renderStatus(status) {
     );
 }
 
-function renderRubberTypes(rubber_type_codes) {
+// ---- map ประเภทสีตามชนิดยาง ----
+function getRubberTypeBadgeColor(label) {
+    const txt = String(label || "").toUpperCase();
+    if (txt.includes("EUDR")) return "orange";
+    if (txt.includes("FSC")) return "green";
+    return "blue"; // Regular / อื่น ๆ
+}
+
+function renderRubberTypes(rubber_type_codes, rubberTypesMap) {
     if (!Array.isArray(rubber_type_codes) || rubber_type_codes.length === 0) {
         return (
             <Text size="xs" c="dimmed">
@@ -35,34 +55,38 @@ function renderRubberTypes(rubber_type_codes) {
             </Text>
         );
     }
+
     return (
         <Group gap={4} wrap="wrap">
-            {rubber_type_codes.map((code) => (
-                <Badge
-                    key={code}
-                    size="xs"
-                    radius="sm"
-                    variant="light"
-                    color="teal"
-                >
-                    {code}
-                </Badge>
-            ))}
+            {rubber_type_codes.map((code) => {
+                const rt = rubberTypesMap?.[code];
+                const label = rt?.name || code;
+                const color = getRubberTypeBadgeColor(label);
+                return (
+                    <Badge
+                        key={code}
+                        size="xs"
+                        radius="sm"
+                        variant="light"
+                        color={color}
+                    >
+                        {label}
+                    </Badge>
+                );
+            })}
         </Group>
     );
 }
 
 function renderAddress(address) {
     if (!address) return "-";
-    const parts = [
-        address.sub_district_th,
-        address.district_th,
-        address.province_th,
-        address.zipcode || address.zip_code,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-    return parts || address.address_line || "-";
+    // แสดงเฉพาะจังหวัด
+    const province =
+        address.province_th ||
+        address.province_en ||
+        address.province ||
+        address.changwat;
+    return province || "-";
 }
 
 export default function SuppliersTable({
@@ -71,6 +95,7 @@ export default function SuppliersTable({
     canManageSuppliers = false,
     onEdit,
     onDelete,
+    rubberTypesMap = {}, // 👈 map code -> { name, ... }
 }) {
     const hasData = Array.isArray(suppliers) && suppliers.length > 0;
 
@@ -86,9 +111,9 @@ export default function SuppliersTable({
         >
             <Table.Thead>
                 <Table.Tr>
-                    <Table.Th style={{ width: "16%" }}>Code</Table.Th>
+                    <Table.Th style={{ width: "12%" }}>Code</Table.Th>
                     <Table.Th style={{ width: "24%" }}>Name</Table.Th>
-                    <Table.Th style={{ width: "13%" }}>Phone</Table.Th>
+                    <Table.Th style={{ width: "14%" }}>Phone</Table.Th>
                     <Table.Th style={{ width: "12%" }}>Status</Table.Th>
                     <Table.Th style={{ width: "20%" }}>Rubber Types</Table.Th>
                     <Table.Th>Address</Table.Th>
@@ -161,34 +186,28 @@ export default function SuppliersTable({
                     hasData &&
                     suppliers.map((item) => {
                         const id = getId(item);
+
+                        // ชื่อ: คำนำหน้า + ชื่อ (ติดกัน) + เว้นวรรค + นามสกุล
+                        const fullName =
+                            (item.title || "") +
+                            (item.first_name || "") +
+                            (item.last_name
+                                ? ` ${item.last_name}`
+                                : "") || item.display_name;
+
                         return (
                             <Table.Tr key={id || item.code}>
+                                {/* Code (ไม่แสดง ID แล้ว) */}
                                 <Table.Td>
                                     <Text fw={600} size="sm">
                                         {item.code}
                                     </Text>
-                                    {id && (
-                                        <Text
-                                            size="xs"
-                                            c="dimmed"
-                                            mt={2}
-                                            style={{
-                                                fontFamily:
-                                                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                                            }}
-                                        >
-                                            ID: {id}
-                                        </Text>
-                                    )}
                                 </Table.Td>
 
+                                {/* Name */}
                                 <Table.Td>
                                     <Text size="sm">
-                                        {item.display_name ||
-                                            [item.title, item.first_name, item.last_name]
-                                                .filter(Boolean)
-                                                .join(" ") ||
-                                            "-"}
+                                        {fullName || item.display_name || "-"}
                                     </Text>
                                     {item.email && (
                                         <Text size="xs" c="dimmed">
@@ -197,22 +216,32 @@ export default function SuppliersTable({
                                     )}
                                 </Table.Td>
 
+                                {/* Phone (format) */}
                                 <Table.Td>
-                                    <Text size="sm">{item.phone || "-"}</Text>
+                                    <Text size="sm">
+                                        {formatPhone(item.phone)}
+                                    </Text>
                                 </Table.Td>
 
+                                {/* Status */}
                                 <Table.Td>{renderStatus(item.status)}</Table.Td>
 
+                                {/* Rubber Types (name + สี) */}
                                 <Table.Td>
-                                    {renderRubberTypes(item.rubber_type_codes)}
+                                    {renderRubberTypes(
+                                        item.rubber_type_codes,
+                                        rubberTypesMap
+                                    )}
                                 </Table.Td>
 
+                                {/* Address (จังหวัด) */}
                                 <Table.Td>
                                     <Text size="sm" c="dimmed">
                                         {renderAddress(item.address)}
                                     </Text>
                                 </Table.Td>
 
+                                {/* Actions */}
                                 {canManageSuppliers && (
                                     <Table.Td>
                                         <Group

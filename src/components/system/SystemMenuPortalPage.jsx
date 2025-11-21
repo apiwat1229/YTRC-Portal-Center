@@ -17,7 +17,7 @@ import {
 } from "@mantine/core";
 
 import {
-    IconActivity,
+    IconSettingsCog,
     IconBox,
     IconKey,
     IconShieldLock,
@@ -30,7 +30,7 @@ import { can } from "../auth/permission";
 import UserHeaderPanel from "../common/UserHeaderPanel";
 
 const APP_NAME = "YTRC Portal Center";
-const PAGE_TITLE = "System Center";
+const PAGE_TITLE = "System Settings";
 
 export default function SystemMenuPortalPage({
     auth,
@@ -97,7 +97,7 @@ export default function SystemMenuPortalPage({
                                             deg: 135,
                                         }}
                                     >
-                                        <IconActivity size={28} />
+                                        <IconSettingsCog size={28} />
                                     </ThemeIcon>
                                     <div>
                                         <Text
@@ -109,7 +109,7 @@ export default function SystemMenuPortalPage({
                                                 color: "#1e293b",
                                             }}
                                         >
-                                            SYSTEM CENTER
+                                            SYSTEM Settings
                                         </Text>
                                         <Text
                                             size="xs"
@@ -191,7 +191,7 @@ export default function SystemMenuPortalPage({
                                         onClick={() => {
                                             if (!canSuppliers) return;
                                             setActiveTool("suppliers");
-                                            navigate("/cuplump/suppliers");
+                                            navigate("/system/suppliers");
                                         }}
                                     />
 

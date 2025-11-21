@@ -23,6 +23,7 @@ import {
     IconActivity,
     IconArrowLeft,
     IconCheck,
+    IconCookie,
     IconPlus,
     IconX,
 } from "@tabler/icons-react";
@@ -285,7 +286,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                             deg: 135,
                                         }}
                                     >
-                                        <IconActivity size={28} />
+                                        <IconCookie size={28} />
                                     </ThemeIcon>
                                     <div>
                                         <Text
@@ -306,7 +307,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                             tt="uppercase"
                                             style={{ letterSpacing: "1px" }}
                                         >
-                                            YTRC Master Data
+                                            Purchasing Data
                                         </Text>
                                     </div>
                                 </Group>

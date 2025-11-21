@@ -11,6 +11,7 @@ import {
     Container,
     Divider,
     Group,
+    Pagination,
     Select,
     Stack,
     Text,
@@ -20,10 +21,10 @@ import {
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import {
+    IconActivity,
     IconArrowLeft,
     IconCheck,
     IconPlus,
-    IconTruck,
     IconX,
 } from "@tabler/icons-react";
 
@@ -38,6 +39,15 @@ const STATUS_FILTER_OPTIONS = [
     { value: "suspended", label: "Suspended" },
 ];
 
+const PAGE_SIZE_OPTIONS = [
+    { value: "10", label: "10 / หน้า" },
+    { value: "25", label: "25 / หน้า" },
+    { value: "50", label: "50 / หน้า" },
+    { value: "100", label: "100 / หน้า" },
+];
+
+const FETCH_LIMIT = 200; // โหลดมาแล้ว filter + paginate ฝั่ง FE
+
 export default function SuppliersPage({ auth, onLogout }) {
     const { user } = auth || {};
     const navigate = useNavigate();
@@ -46,13 +56,37 @@ export default function SuppliersPage({ auth, onLogout }) {
     const canManageSuppliers =
         can(user, "portal.cuplump.suppliers.manage") || isSuperuser(user);
 
-    const [items, setItems] = useState([]);
+    const [allSuppliers, setAllSuppliers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
+
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState(null);
+    const [addressFilter, setAddressFilter] = useState("");
+    const [rubberTypeFilter, setRubberTypeFilter] = useState(null);
+
     const [page, setPage] = useState(1);
-    const limit = 50;
+    const [pageSize, setPageSize] = useState(10);
+
+    // rubber types สำหรับ map code -> name + filter
+    const [rubberTypesMap, setRubberTypesMap] = useState({});
+    const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
+
+    // สร้าง option จังหวัดสำหรับ filter
+    const addressOptions = useMemo(() => {
+        const set = new Set();
+
+        allSuppliers.forEach((s) => {
+            const a = s.address || {};
+            const province =
+                a.province_th || a.province_en || a.province || a.changwat;
+            if (province) set.add(province);
+        });
+
+        return Array.from(set)
+            .sort((a, b) => a.localeCompare(b, "th"))
+            .map((p) => ({ value: p, label: p }));
+    }, [allSuppliers]);
 
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -64,42 +98,62 @@ export default function SuppliersPage({ auth, onLogout }) {
         );
     }, [user]);
 
-    const fetchSuppliers = async () => {
-        if (!canViewSuppliers) return;
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (search) params.append("q", search);
-            if (statusFilter) params.append("status", statusFilter);
-            params.append("limit", String(limit));
-            params.append("page", String(page));
+    const effectiveNotificationsCount = 0;
 
-            const data = await apiRequest(
-                `/suppliers/?${params.toString()}`,
-                {},
-                auth
-            );
-            setItems(Array.isArray(data) ? data : []);
-        } catch (err) {
-            console.error("[SuppliersPage] fetch error:", err);
-            showNotification({
-                title: "โหลดรายการ Supplier ไม่สำเร็จ",
-                message: err.message || "เกิดข้อผิดพลาดในการดึงข้อมูล",
-                color: "red",
-                icon: <IconX size={16} />,
-            });
-            if (err.status === 401 && typeof onLogout === "function") {
-                onLogout();
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // ===== โหลด suppliers + rubber types =====
     useEffect(() => {
-        fetchSuppliers();
+        const fetchData = async () => {
+            if (!canViewSuppliers) return;
+
+            setLoading(true);
+            try {
+                // suppliers
+                const params = new URLSearchParams();
+                params.append("limit", String(FETCH_LIMIT));
+                params.append("page", "1");
+                const supplierData = await apiRequest(
+                    `/suppliers/?${params.toString()}`,
+                    {},
+                    auth
+                );
+                setAllSuppliers(
+                    Array.isArray(supplierData) ? supplierData : []
+                );
+
+                // rubber types (ใช้สำหรับ map ชื่อ + filter)
+                const rt = await apiRequest(`/rubber-types?limit=200`, {}, auth);
+                if (Array.isArray(rt)) {
+                    const map = {};
+                    rt.forEach((r) => {
+                        map[r.code] = r;
+                    });
+                    setRubberTypesMap(map);
+                    setRubberTypeOptions(
+                        rt.map((r) => ({
+                            value: r.code,
+                            label: r.name,
+                        }))
+                    );
+                }
+            } catch (err) {
+                console.error("[SuppliersPage] fetch error:", err);
+                showNotification({
+                    title: "โหลดรายการ Suppliers ไม่สำเร็จ",
+                    message: err.message || "เกิดข้อผิดพลาดในการดึงข้อมูล",
+                    color: "red",
+                    icon: <IconX size={16} />,
+                });
+                if (err.status === 401 && typeof onLogout === "function") {
+                    onLogout();
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, statusFilter, page]);
+    }, []);
 
     const handleGoBackSystem = () => {
         if (window.history.length > 1) {
@@ -111,26 +165,29 @@ export default function SuppliersPage({ auth, onLogout }) {
 
     const handleCreate = () => {
         if (!canManageSuppliers) return;
+        // ✅ ไปหน้า Create Supplier (module cuplump)
         navigate("/cuplump/suppliers/new");
     };
 
     const handleEdit = (item) => {
         if (!canManageSuppliers) return;
-        const id = item.id || item._id;
+        const id = item.id || item._id || item.supplier_id;
         if (!id) return;
+        // ✅ ไปหน้า Edit Supplier
         navigate(`/cuplump/suppliers/${id}/edit`);
     };
 
     const handleDelete = async (item) => {
         if (!canManageSuppliers) return;
-        const id = item.id || item._id;
+        const id = item.id || item._id || item.supplier_id;
         if (!id) return;
 
         try {
             setLoadingAction(true);
             await apiRequest(`/suppliers/${id}`, { method: "DELETE" }, auth);
-            setItems((prev) => prev.filter((x) => (x.id || x._id) !== id));
-
+            setAllSuppliers((prev) =>
+                prev.filter((s) => (s.id || s._id || s.supplier_id) !== id)
+            );
             showNotification({
                 title: "ลบ Supplier สำเร็จ",
                 message: item.display_name || item.code,
@@ -150,9 +207,127 @@ export default function SuppliersPage({ auth, onLogout }) {
         }
     };
 
-    const effectiveNotificationsCount = 0;
+    // ===== Filter ทั้งหมด (q + status + address + rubberType) =====
+    const filteredSuppliers = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const addrFilter = addressFilter.trim().toLowerCase();
+        const rtFilter = rubberTypeFilter;
 
-    // ไม่มีสิทธิ์ View
+        return allSuppliers.filter((s) => {
+            // status
+            if (statusFilter && String(s.status) !== statusFilter) {
+                return false;
+            }
+
+            // filter Rubber Type (เลือก code)
+            if (rtFilter) {
+                const codes = Array.isArray(s.rubber_type_codes)
+                    ? s.rubber_type_codes
+                    : [];
+                if (!codes.includes(rtFilter)) return false;
+            }
+
+            // filter address (จังหวัด)
+            if (addrFilter) {
+                const a = s.address || {};
+                const province =
+                    a.province_th ||
+                    a.province_en ||
+                    a.province ||
+                    a.changwat ||
+                    "";
+                if (
+                    String(province).toLowerCase() !==
+                    String(addrFilter).toLowerCase()
+                ) {
+                    return false;
+                }
+            }
+
+            // global search q
+            if (!q) return true;
+
+            const addressText = (() => {
+                const a = s.address || {};
+                return (
+                    [
+                        a.sub_district_th,
+                        a.district_th,
+                        a.province_th,
+                        a.zipcode || a.zip_code,
+                        a.address_line,
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase() || ""
+                );
+            })();
+
+            const rubberText = (() => {
+                const codes = Array.isArray(s.rubber_type_codes)
+                    ? s.rubber_type_codes
+                    : [];
+                const names = codes
+                    .map((code) => rubberTypesMap[code]?.name || code)
+                    .join(" ")
+                    .toLowerCase();
+                return names;
+            })();
+
+            const fullName =
+                (s.title || "") +
+                (s.first_name || "") +
+                (s.last_name ? ` ${s.last_name}` : "");
+            const nameText =
+                (fullName || s.display_name || "")
+                    .toString()
+                    .toLowerCase() || "";
+
+            const phoneText = (s.phone || "").toString().toLowerCase();
+            const emailText = (s.email || "").toString().toLowerCase();
+            const codeText = (s.code || "").toString().toLowerCase();
+
+            return (
+                nameText.includes(q) ||
+                codeText.includes(q) ||
+                phoneText.includes(q) ||
+                emailText.includes(q) ||
+                addressText.includes(q) ||
+                rubberText.includes(q)
+            );
+        });
+    }, [
+        allSuppliers,
+        search,
+        statusFilter,
+        addressFilter,
+        rubberTypeFilter,
+        rubberTypesMap,
+    ]);
+
+    // reset page เมื่อ filter เปลี่ยน
+    useEffect(() => {
+        setPage(1);
+    }, [search, statusFilter, addressFilter, rubberTypeFilter, pageSize]);
+
+    // ===== Pagination =====
+    const total = filteredSuppliers.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(page, totalPages);
+
+    const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const endIndex =
+        total === 0
+            ? 0
+            : Math.min(currentPage * pageSize, filteredSuppliers.length);
+
+    const pageItems = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        return filteredSuppliers.slice(start, end);
+    }, [filteredSuppliers, currentPage, pageSize]);
+
+    // ===== ถ้าไม่มีสิทธิ์ view =====
     if (!canViewSuppliers) {
         return (
             <div
@@ -172,6 +347,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                     <AppShell.Main>
                         <Container size="lg" py="md">
                             <Stack gap="xl">
+                                {/* Header */}
                                 <Group justify="space-between" align="center">
                                     <Group gap="md">
                                         <ThemeIcon
@@ -184,7 +360,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                 deg: 135,
                                             }}
                                         >
-                                            <IconTruck size={28} />
+                                            <IconActivity size={28} />
                                         </ThemeIcon>
                                         <div>
                                             <Text
@@ -205,7 +381,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                 tt="uppercase"
                                                 style={{ letterSpacing: "1px" }}
                                             >
-                                                YTRC Master Data
+                                                YTRC MASTER DATA
                                             </Text>
                                         </div>
                                     </Group>
@@ -225,7 +401,8 @@ export default function SuppliersPage({ auth, onLogout }) {
                                 <Card withBorder radius="md" shadow="xs">
                                     <Stack gap="sm" align="center">
                                         <Title order={4}>
-                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล Supplier
+                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล
+                                            Suppliers
                                         </Title>
                                         <Text size="sm" c="dimmed" ta="center">
                                             กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
@@ -256,7 +433,7 @@ export default function SuppliersPage({ auth, onLogout }) {
         );
     }
 
-    // ปกติ
+    // ===== ปกติ =====
     return (
         <div
             style={{
@@ -288,7 +465,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                             deg: 135,
                                         }}
                                     >
-                                        <IconTruck size={28} />
+                                        <IconActivity size={28} />
                                     </ThemeIcon>
                                     <div>
                                         <Text
@@ -309,7 +486,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                             tt="uppercase"
                                             style={{ letterSpacing: "1px" }}
                                         >
-                                            YTRC Master Data
+                                            YTRC MASTER DATA
                                         </Text>
                                     </div>
                                 </Group>
@@ -326,62 +503,106 @@ export default function SuppliersPage({ auth, onLogout }) {
                                 />
                             </Group>
 
-                            {/* MAIN CONTENT */}
+                            {/* MAIN CARD */}
                             <Card withBorder radius="md" shadow="xs">
                                 <Stack gap="sm">
+                                    {/* Title + filters + New button */}
                                     <Group
                                         justify="space-between"
                                         align="flex-end"
+                                        wrap="wrap"
                                     >
+                                        {/* ซ้าย: ชื่อ section */}
                                         <Stack gap={2}>
-                                            <Title order={5}>
-                                                Suppliers
-                                            </Title>
+                                            <Title order={5}>Suppliers</Title>
                                             <Text size="xs" c="dimmed">
-                                                จัดการข้อมูลคู่ค้า/ผู้ส่งมอบ สำหรับระบบรับซื้อยางและระบบคิว
+                                                จัดการข้อมูลคู่ค้า/ผู้ส่งมอบ
+                                                สำหรับระบบรับซื้อยางและระบบคิว
                                             </Text>
                                         </Stack>
 
-                                        <Group gap="xs">
+                                        {/* กลาง: filters (กินพื้นที่ยืดหยุ่น) */}
+                                        <Group
+                                            gap="xs"
+                                            wrap="wrap"
+                                            align="flex-end"
+                                            style={{
+                                                flex: 1,
+                                                justifyContent: "flex-end",
+                                            }}
+                                        >
+                                            {/* Global search */}
                                             <TextInput
-                                                placeholder="ค้นหาด้วยชื่อ, code, phone, email"
+                                                placeholder="ค้นหาด้วยชื่อ, code, phone, email, address, rubber type"
                                                 size="xs"
                                                 value={search}
-                                                onChange={(e) => {
-                                                    setPage(1);
+                                                onChange={(e) =>
                                                     setSearch(
                                                         e.currentTarget.value
-                                                    );
-                                                }}
+                                                    )
+                                                }
                                                 style={{ minWidth: 260 }}
                                             />
+
+                                            {/* Status */}
                                             <Select
                                                 placeholder="Status"
                                                 size="xs"
                                                 data={STATUS_FILTER_OPTIONS}
                                                 value={statusFilter}
-                                                onChange={(v) => {
-                                                    setPage(1);
-                                                    setStatusFilter(v);
-                                                }}
+                                                onChange={(v) =>
+                                                    setStatusFilter(v)
+                                                }
                                                 clearable
+                                                style={{ width: 130 }}
                                             />
-                                            {canManageSuppliers && (
-                                                <Button
-                                                    size="xs"
-                                                    leftSection={
-                                                        <IconPlus size={14} />
-                                                    }
-                                                    onClick={handleCreate}
-                                                >
-                                                    New Supplier
-                                                </Button>
-                                            )}
+
+                                            {/* Rubber Types filter */}
+                                            <Select
+                                                placeholder="Rubber Types"
+                                                size="xs"
+                                                data={rubberTypeOptions}
+                                                value={rubberTypeFilter}
+                                                onChange={(v) =>
+                                                    setRubberTypeFilter(v)
+                                                }
+                                                searchable
+                                                clearable
+                                                style={{ width: 180 }}
+                                            />
+
+                                            {/* Address filter (จังหวัด) */}
+                                            <Select
+                                                placeholder="จังหวัด"
+                                                size="xs"
+                                                data={addressOptions}
+                                                value={addressFilter}
+                                                onChange={(v) =>
+                                                    setAddressFilter(v || "")
+                                                }
+                                                searchable
+                                                clearable
+                                                style={{ width: 180 }}
+                                            />
                                         </Group>
+
+                                        {/* ขวาสุด: ปุ่ม New Supplier */}
+                                        {canManageSuppliers && (
+                                            <Button
+                                                size="xs"
+                                                leftSection={
+                                                    <IconPlus size={14} />
+                                                }
+                                                onClick={handleCreate}
+                                            >
+                                                + New Supplier
+                                            </Button>
+                                        )}
                                     </Group>
 
                                     <Divider my="xs" />
 
+                                    {/* TABLE */}
                                     <Box
                                         style={{
                                             borderRadius: 8,
@@ -390,14 +611,82 @@ export default function SuppliersPage({ auth, onLogout }) {
                                         }}
                                     >
                                         <SuppliersTable
-                                            suppliers={items}
+                                            suppliers={pageItems}
                                             loading={loading}
                                             canManageSuppliers={
                                                 canManageSuppliers
                                             }
                                             onEdit={handleEdit}
                                             onDelete={handleDelete}
+                                            rubberTypesMap={rubberTypesMap}
                                         />
+                                    </Box>
+
+                                    {/* Footer: actions info + pagination */}
+                                    <Box
+                                        mt="xs"
+                                        pt={8}
+                                        style={{
+                                            borderTop:
+                                                "1px solid rgba(226,232,240,1)",
+                                        }}
+                                    >
+                                        <Group
+                                            justify="space-between"
+                                            align="center"
+                                            wrap="wrap"
+                                        >
+                                            {/* summary */}
+                                            <Text size="xs" c="dimmed">
+                                                แสดง{" "}
+                                                <strong>
+                                                    {startIndex} - {endIndex}
+                                                </strong>{" "}
+                                                จาก{" "}
+                                                <strong>{total}</strong>{" "}
+                                                รายการ
+                                            </Text>
+
+                                            <Group
+                                                gap="xs"
+                                                align="center"
+                                                wrap="wrap"
+                                            >
+                                                <Text
+                                                    size="xs"
+                                                    c="dimmed"
+                                                    mr={2}
+                                                >
+                                                    แสดงต่อหน้า
+                                                </Text>
+                                                <Select
+                                                    size="xs"
+                                                    data={PAGE_SIZE_OPTIONS}
+                                                    value={String(pageSize)}
+                                                    onChange={(v) => {
+                                                        const val = parseInt(
+                                                            v || "10",
+                                                            10
+                                                        );
+                                                        setPageSize(
+                                                            isNaN(val)
+                                                                ? 10
+                                                                : val
+                                                        );
+                                                        setPage(1);
+                                                    }}
+                                                    style={{ width: 110 }}
+                                                />
+                                                <Pagination
+                                                    size="xs"
+                                                    radius="md"
+                                                    value={currentPage}
+                                                    onChange={setPage}
+                                                    total={totalPages}
+                                                    withEdges
+                                                />
+                                            </Group>
+                                        </Group>
                                     </Box>
 
                                     {loadingAction && (

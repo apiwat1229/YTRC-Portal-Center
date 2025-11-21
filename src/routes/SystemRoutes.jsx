@@ -147,17 +147,17 @@ export function renderSystemRoutes({ auth, onLogout }) {
 
             {/* Suppliers list */}
             <Route
-                path="/cuplump/suppliers"
+                path="/system/suppliers"
                 element={<SuppliersPage auth={auth} onLogout={onLogout} />}
             />
             {/* Create Supplier */}
             <Route
-                path="/cuplump/suppliers/new"
+                path="/system/suppliers/new"
                 element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
             />
             {/* Edit Supplier */}
             <Route
-                path="/cuplump/suppliers/:supplierId/edit"
+                path="/system/suppliers/:supplierId/edit"
                 element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
             />
 
