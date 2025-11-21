@@ -294,11 +294,6 @@ export default function LoginScreen({ onSuccess }) {
                     >
                         Version: <Code fz={11}>{APP_VERSION}</Code>
                     </Text>
-                    <div className="text-center mt-2">
-                        <small className="text-muted">
-                            Version: v0.1.0 — API: {import.meta.env.VITE_API_BASE_URL || "n/a"}
-                        </small>
-                    </div>
                 </Stack>
             </Paper>
         </Box>

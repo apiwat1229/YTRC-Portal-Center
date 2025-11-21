@@ -13,6 +13,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mantine/core": "^8.3.8",
+    "@mantine/dates": "^8.3.8",
     "@mantine/form": "^8.3.8",
     "@mantine/hooks": "^8.3.8",
     "@mantine/modals": "^8.3.8",
@@ -23,9 +24,12 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.9.0",
     "axios": "^1.13.2",
+    "dayjs": "^1.11.19",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.9.6"
+    "react-router-dom": "^7.9.6",
+    "timezone": "^1.0.23",
+    "utc": "^0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

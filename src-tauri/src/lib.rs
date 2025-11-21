@@ -1,5 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-
 use tauri::{Builder, Manager};
 
 #[tauri::command]
@@ -13,15 +11,14 @@ pub fn run() {
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
-                if let Some(main_window) = app.get_window("main") {
-                    // เปิด DevTools อัตโนมัติในโหมด dev
+                // แก้ไขจุดนี้: ใน Tauri V2 ต้องใช้ get_webview_window แทน get_window
+                if let Some(main_window) = app.get_webview_window("main") {
                     main_window.open_devtools();
-                    // ปิดทันทีถ้าไม่อยากให้ค้างไว้ก็ได้ (คอมเมนต์บรรทัดนี้ถ้าอยากให้เปิดอยู่)
-                    // main_window.close_devtools();
                 }
             }
             Ok(())
         })
+        // Plugins ที่คุณเพิ่ง cargo add มาจะทำงานได้ถูกต้องตรงนี้
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())

@@ -6,12 +6,14 @@ import SystemMenuPortalPage from "../components/system/SystemMenuPortalPage";
 import UserEditorPage from "../components/admin/users/UserEditorPage";
 import UsersPage from "../components/admin/users/UsersPage";
 
+import BookingQueuePage from "@/components/booking/BookingQueuePage";
 import RubberTypeEditorPage from "../components/admin/rubbertypes/RubberTypeEditorPage";
 import RubberTypesPage from "../components/admin/rubbertypes/RubberTypesPage";
 import SupplierEditorPage from "../components/admin/suppliers/SupplierEditorPage";
 import SuppliersPage from "../components/admin/suppliers/SuppliersPage";
-// ถ้ามีหน้า Permission Manager อยู่แล้ว ค่อยมา import เพิ่มทีหลังได้ เช่น:
-// import PermissionPage from "../components/admin/permissions/PermissionPage";
+
+// ✅ ใช้ตัวเดียวกับ PortalCenterPage
+import { can } from "../components/auth/permission";
 
 /**
  * helper เล็ก ๆ สำหรับห่อ element ให้ต้องล็อกอินก่อน
@@ -30,6 +32,8 @@ const requireAuthElement = (auth, element) => {
  *   {renderSystemRoutes({ auth, onLogout: handleLogout })}
  */
 export function renderSystemRoutes({ auth, onLogout }) {
+    const user = auth?.user;
+
     return (
         <>
             {/* ====== System Menu (หน้าแรกของ /system) ====== */}
@@ -51,7 +55,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                         // ถ้ายังไม่มี notification page ก็ส่ง function เปล่า ๆ ไปก่อน
                         onNotificationsClick={() => { }}
                         notificationsCount={0}
-                    />
+                    />,
                 )}
             />
 
@@ -70,7 +74,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                                 window.location.href = "/system";
                             }
                         }}
-                    />
+                    />,
                 )}
             />
 
@@ -88,7 +92,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                                 window.location.href = "/system/users";
                             }
                         }}
-                    />
+                    />,
                 )}
             />
 
@@ -106,7 +110,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                                 window.location.href = "/system/users";
                             }
                         }}
-                    />
+                    />,
                 )}
             />
 
@@ -119,7 +123,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                         auth={auth}
                         onLogout={onLogout}
                     // ถ้าอยากให้กด Back กลับ System Menu ก็ส่ง navigate ผ่าน prop ภายหลังได้
-                    />
+                    />,
                 )}
             />
 
@@ -130,7 +134,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                     <RubberTypeEditorPage
                         auth={auth}
                         onLogout={onLogout}
-                    />
+                    />,
                 )}
             />
 
@@ -141,24 +145,47 @@ export function renderSystemRoutes({ auth, onLogout }) {
                     <RubberTypeEditorPage
                         auth={auth}
                         onLogout={onLogout}
-                    />
+                    />,
                 )}
             />
 
-            {/* Suppliers list */}
+            {/* ===== Suppliers (Master) ===== */}
             <Route
                 path="/system/suppliers"
-                element={<SuppliersPage auth={auth} onLogout={onLogout} />}
+                element={requireAuthElement(
+                    auth,
+                    <SuppliersPage auth={auth} onLogout={onLogout} />,
+                )}
             />
-            {/* Create Supplier */}
+
             <Route
                 path="/system/suppliers/new"
-                element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
+                element={requireAuthElement(
+                    auth,
+                    <SupplierEditorPage auth={auth} onLogout={onLogout} />,
+                )}
             />
-            {/* Edit Supplier */}
+
             <Route
                 path="/system/suppliers/:supplierId/edit"
-                element={<SupplierEditorPage auth={auth} onLogout={onLogout} />}
+                element={requireAuthElement(
+                    auth,
+                    <SupplierEditorPage auth={auth} onLogout={onLogout} />,
+                )}
+            />
+
+            {/* ===== Booking Queue (หน้าใหม่ /booking) ===== */}
+            <Route
+                path="/booking"
+                element={requireAuthElement(
+                    auth,
+                    can(user, "portal.app.booking.view") ? (
+                        <BookingQueuePage auth={auth} onLogout={onLogout} />
+                    ) : (
+                        // ถ้าไม่มีสิทธิ์ → ส่งกลับหน้าแรก
+                        <Navigate to="/" replace />
+                    ),
+                )}
             />
 
             {/*
