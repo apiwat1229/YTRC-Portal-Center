@@ -18,6 +18,11 @@ import { IconCalendar } from "@tabler/icons-react";
 
 import { http } from "@/helpers/http";
 
+// ===== ปรับให้ตรงกับ BE จริง =====
+// ตอนนี้อิง pattern เดิมของ API: /suppliers/ และ /rubber-types/
+const SUPPLIER_ENDPOINT = "/suppliers/";        // => https://.../api/suppliers/
+const RUBBERTYPE_ENDPOINT = "/rubber-types/";   // => https://.../api/rubber-types/
+
 function genBookingCode(dateObj, queueNo) {
     if (!dateObj || !queueNo) return "";
     const d = dayjs(dateObj);
@@ -56,6 +61,10 @@ export default function AddBookingDrawer({
         recorder: "",
     });
 
+    // options จาก BE
+    const [supplierOptions, setSupplierOptions] = useState([]);
+    const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
+
     // เวลาเปิด drawer หรือ defaults เปลี่ยน → ตั้งค่าเริ่มต้นในฟอร์ม
     useEffect(() => {
         if (!opened) return;
@@ -77,6 +86,93 @@ export default function AddBookingDrawer({
             recorder: base.recorder || "",
         });
     }, [opened, defaults]);
+
+    // โหลด suppliers & rubber types จาก BE ทุกครั้งที่เปิด drawer
+    useEffect(() => {
+        if (!opened) return;
+
+        const fetchSuppliers = async () => {
+            try {
+                console.log("[AddBookingDrawer] GET suppliers:", SUPPLIER_ENDPOINT);
+                const resp = await http.get(SUPPLIER_ENDPOINT, {
+                    params: { limit: 200 },
+                });
+
+                const data = Array.isArray(resp.data)
+                    ? resp.data
+                    : resp.data?.items || [];
+
+                const options = data.map((s) => {
+                    const code =
+                        s.code ||
+                        s.supplier_code ||
+                        s.sup_code ||
+                        s.id ||
+                        s._id ||
+                        "";
+                    const name =
+                        s.name ||
+                        s.name_th ||
+                        s.supplier_name ||
+                        s.full_name ||
+                        "";
+                    const label = [code, name].filter(Boolean).join(" : ");
+
+                    return {
+                        value: name || code || "",
+                        label: label || "(unknown supplier)",
+                    };
+                });
+
+                setSupplierOptions(options);
+            } catch (err) {
+                console.error("[AddBookingDrawer] fetch suppliers error:", err);
+                setSupplierOptions([]);
+            }
+        };
+
+        const fetchRubberTypes = async () => {
+            try {
+                console.log("[AddBookingDrawer] GET rubber types:", RUBBERTYPE_ENDPOINT);
+                const resp = await http.get(RUBBERTYPE_ENDPOINT, {
+                    params: { limit: 200 },
+                });
+
+                const data = Array.isArray(resp.data)
+                    ? resp.data
+                    : resp.data?.items || [];
+
+                const options = data.map((r) => {
+                    const code =
+                        r.code ||
+                        r.rubbertype_code ||
+                        r.rt_code ||
+                        r.id ||
+                        r._id ||
+                        "";
+                    const name =
+                        r.name ||
+                        r.rubbertype_name ||
+                        r.description ||
+                        "";
+                    const label = [code, name].filter(Boolean).join(" : ");
+
+                    return {
+                        value: name || code || "",
+                        label: label || "(unknown type)",
+                    };
+                });
+
+                setRubberTypeOptions(options);
+            } catch (err) {
+                console.error("[AddBookingDrawer] fetch rubber types error:", err);
+                setRubberTypeOptions([]);
+            }
+        };
+
+        fetchSuppliers();
+        fetchRubberTypes();
+    }, [opened]);
 
     const updateForm = (field, value) => {
         setForm((prev) => {
@@ -145,10 +241,18 @@ export default function AddBookingDrawer({
                     <Grid gutter="md">
                         {/* Start / End time */}
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            <TextInput label="Start Time *" value={form.start_time} readOnly />
+                            <TextInput
+                                label="Start Time *"
+                                value={form.start_time}
+                                readOnly
+                            />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            <TextInput label="End Time *" value={form.end_time} readOnly />
+                            <TextInput
+                                label="End Time *"
+                                value={form.end_time}
+                                readOnly
+                            />
                         </Grid.Col>
 
                         {/* Date / Booking Code */}
@@ -156,7 +260,9 @@ export default function AddBookingDrawer({
                             <DateInput
                                 label="Date *"
                                 value={form.date}
-                                onChange={(value) => value && updateForm("date", value)}
+                                onChange={(value) =>
+                                    value && updateForm("date", value)
+                                }
                                 leftSection={<IconCalendar size={16} />}
                                 valueFormat="DD-MMM-YYYY"
                             />
@@ -181,15 +287,15 @@ export default function AddBookingDrawer({
                             />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            <TextInput
+                            <Select
                                 label="Supplier *"
                                 placeholder="Select Supplier"
+                                data={supplierOptions}
+                                searchable
+                                nothingFoundMessage="ไม่พบ Supplier"
                                 value={form.supplier}
-                                onChange={(e) =>
-                                    updateForm("supplier", e.currentTarget.value)
-                                }
+                                onChange={(val) => updateForm("supplier", val || "")}
                             />
-                            {/* TODO: เปลี่ยนเป็น Select + ดึง suppliers จาก API ภายหลัง */}
                         </Grid.Col>
 
                         {/* Truck type / License plate */}
@@ -220,15 +326,15 @@ export default function AddBookingDrawer({
 
                         {/* Type / Recorder */}
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            <TextInput
+                            <Select
                                 label="Type *"
                                 placeholder="Select Rubber Type"
+                                data={rubberTypeOptions}
+                                searchable
+                                nothingFoundMessage="ไม่พบ Rubber Type"
                                 value={form.rubber_type}
-                                onChange={(e) =>
-                                    updateForm("rubber_type", e.currentTarget.value)
-                                }
+                                onChange={(val) => updateForm("rubber_type", val || "")}
                             />
-                            {/* TODO: เปลี่ยนเป็น Select ดึง RubberType จาก API ภายหลัง */}
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
                             <TextInput
