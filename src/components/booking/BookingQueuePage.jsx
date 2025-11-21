@@ -32,6 +32,7 @@ import { http } from "@/helpers/http";
 import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
 import AddBookingDrawer from "./AddBookingDrawer";
+import BookingTicketModal from "./BookingTicketModal";
 
 // ===== config slot เวลาให้เหมือน BE =====
 const SLOT_OPTIONS = [
@@ -75,36 +76,26 @@ function getQueueId(q) {
     return q?.id || q?._id || q?.booking_id || null;
 }
 
-// ====== ฟังก์ชันคำนวณคิวถัดไปแบบเติมช่องว่าง ======
-function computeNextQueueNo(queues, slotConfig) {
-    const start = slotConfig.start ?? 1;
-    const limit = slotConfig.limit;
+// แปลง date จาก queue → Date object (สำหรับส่งเข้า Drawer)
+function parseQueueDate(dateField) {
+    if (!dateField) return new Date();
+    if (dateField instanceof Date) return dateField;
 
-    // ดึงเฉพาะเลขคิวที่เป็นตัวเลข และ >= start
-    const existingNumbers = queues
-        .map((q) => Number(q.queue_no))
-        .filter((n) => Number.isFinite(n) && n >= start);
-
-    const used = new Set(existingNumbers);
-
-    // slot แบบจำกัดจำนวน
-    if (limit != null) {
-        const end = start + limit - 1;
-        for (let n = start; n <= end; n++) {
-            if (!used.has(n)) {
-                return n; // เจอช่องว่างตัวแรก
-            }
-        }
-        // ถ้าไม่เหลือช่องว่างเลย แปลว่าเต็ม
-        return null;
+    if (typeof dateField === "object" && "$date" in dateField) {
+        const raw = dateField.$date;
+        if (typeof raw === "string") return new Date(raw);
+        return new Date(raw);
     }
 
-    // slot แบบไม่จำกัด (14:00-15:00) → หาเลขว่างจาก start ขึ้นไปเรื่อย ๆ
-    let candidate = start;
-    while (used.has(candidate)) {
-        candidate += 1;
+    if (typeof dateField === "string") {
+        // "2025-11-21" หรือ "2025-11-21T00:00:00Z"
+        const iso = dateField.includes("T")
+            ? dateField
+            : `${dateField}T00:00:00`;
+        return new Date(iso);
     }
-    return candidate;
+
+    return new Date();
 }
 
 export default function BookingQueuePage({
@@ -130,6 +121,9 @@ export default function BookingQueuePage({
     // ลบอยู่ตัวไหน
     const [deletingId, setDeletingId] = useState(null);
 
+    // Ticket modal
+    const [ticketQueue, setTicketQueue] = useState(null);
+
     // ===== ชื่อใน header ขวาบน =====
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -153,22 +147,36 @@ export default function BookingQueuePage({
 
     const effectiveNotificationsCount = notificationsCount;
 
-    // ===== คำนวณคิวตาม slot =====
+    // ===== คำนวณคิวตาม slot & จำนวนคิวใน slot ปัจจุบัน =====
     const slotConfig = useMemo(
         () => getSlotConfig(selectedSlot),
         [selectedSlot],
     );
 
-    const nextQueueNo = useMemo(
-        () => computeNextQueueNo(queues, slotConfig),
-        [queues, slotConfig],
-    );
-
     const isSlotFull = useMemo(() => {
-        if (!slotConfig.limit) return false; // ไม่จำกัด
-        // ถ้าไม่มีคิวว่างให้จองแล้ว = เต็ม
-        return nextQueueNo === null;
-    }, [slotConfig, nextQueueNo]);
+        if (!slotConfig.limit) return false;
+        return queues.length >= slotConfig.limit;
+    }, [slotConfig, queues]);
+
+    // หาคิวถัดไป: ถ้ามีเลขหายไปให้ใช้เลขที่หาย
+    const nextQueueNo = useMemo(() => {
+        const used = queues
+            .map((q) => Number(q.queue_no))
+            .filter((n) => !Number.isNaN(n))
+            .sort((a, b) => a - b);
+
+        let candidate = slotConfig.start;
+        while (true) {
+            if (!slotConfig.limit || candidate < slotConfig.start + slotConfig.limit) {
+                if (!used.includes(candidate)) {
+                    return candidate;
+                }
+                candidate += 1;
+            } else {
+                return slotConfig.start + used.length;
+            }
+        }
+    }, [slotConfig, queues]);
 
     const slotQueueRangeLabel = useMemo(() => {
         if (!slotConfig.limit) {
@@ -210,15 +218,13 @@ export default function BookingQueuePage({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDate, selectedSlot]);
 
-    // ------- handler เวลาเลือก slot -------
     const handleSlotClick = (value) => {
         setSelectedSlot(value);
     };
 
     // ------- เปิด Drawer สำหรับสร้าง Booking ใหม่ -------
     const handleOpenCreateBooking = () => {
-        // ถ้าเต็มแล้ว ห้ามเปิด
-        if (isSlotFull || nextQueueNo == null) {
+        if (isSlotFull) {
             alert("ช่วงเวลานี้เต็มแล้ว (สูงสุด 4 คิวต่อช่วงเวลา)");
             return;
         }
@@ -226,17 +232,42 @@ export default function BookingQueuePage({
         const [startTime, endTime] = selectedSlot.split("-");
 
         setDrawerDefaults({
+            mode: "create",
             date: selectedDate,
             start_time: startTime,
             end_time: endTime,
-            queue_no: nextQueueNo, // ⭐ ใช้คิวว่างตัวแรก
+            queue_no: nextQueueNo,
             recorder: displayName || "",
         });
         setDrawerOpened(true);
     };
 
+    // ------- เปิด Drawer สำหรับแก้ไข -------
     const handleEdit = (queue) => {
-        console.log("edit queue", queue);
+        if (!queue) return;
+
+        const [startTime, endTime] =
+            (queue.slot || selectedSlot || "").split("-").length === 2
+                ? (queue.slot || selectedSlot).split("-")
+                : [queue.start_time, queue.end_time];
+
+        setDrawerDefaults({
+            mode: "edit",
+            id: getQueueId(queue),
+            date: parseQueueDate(queue.date),
+            start_time: startTime || "",
+            end_time: endTime || "",
+            supplier_code: queue.supplier_code || queue.code || "",
+            supplier_name: queue.supplier_name || queue.name || "",
+            truck_type: queue.truck_type || "",
+            truck_register: queue.truck_register || queue.truck || "",
+            rubber_type: queue.rubber_type || queue.type || "",
+            booking_code: queue.booking_code || "",
+            queue_no: queue.queue_no,
+            recorder: queue.recorder || displayName || "",
+            note: queue.note || "",
+        });
+        setDrawerOpened(true);
     };
 
     // ===== ฟังก์ชันลบจริง ๆ (ยิง API) =====
@@ -250,7 +281,6 @@ export default function BookingQueuePage({
 
         try {
             setDeletingId(id);
-            console.log("[BookingQueuePage] DELETE /bookings/", id);
             await http.delete(`/bookings/${id}`);
             await fetchQueues();
         } catch (err) {
@@ -261,7 +291,6 @@ export default function BookingQueuePage({
         }
     };
 
-    // ===== เปิด Confirm Modal ตอนกดลบ =====
     const handleDelete = (queue) => {
         const id = getQueueId(queue);
         if (!id) {
@@ -273,8 +302,10 @@ export default function BookingQueuePage({
             title: "ยืนยันการลบคิว",
             children: (
                 <Text size="sm">
-                    คุณต้องการลบคิวหมายเลข <b>{queue.queue_no ?? "-"}</b> ของ{" "}
-                    <b>{queue.name ?? "ไม่ทราบชื่อ"}</b> ใช่หรือไม่?
+                    คุณต้องการลบคิวหมายเลข{" "}
+                    <b>{queue.queue_no ?? "-"}</b> ของ{" "}
+                    <b>{queue.name ?? queue.supplier_name ?? "ไม่ทราบชื่อ"}</b>{" "}
+                    ใช่หรือไม่?
                 </Text>
             ),
             labels: { confirm: "ลบคิว", cancel: "ยกเลิก" },
@@ -286,9 +317,28 @@ export default function BookingQueuePage({
         });
     };
 
+    // =========================================================
+    // 🚀 FIX: เตรียมข้อมูลก่อนส่งเข้า Ticket Modal
+    // =========================================================
     const handleTicket = (queue) => {
-        console.log("ticket for", queue);
+        // ดึงค่า default เวลาจาก slot ที่เลือกอยู่ (กรณีใน queue ไม่มีมาให้)
+        const [defaultStart, defaultEnd] = (selectedSlot || "").split("-");
+
+        // สร้าง object ใหม่ที่ Merge ข้อมูลจาก State หน้าเว็บเข้าไปด้วย
+        // เพื่อให้ Modal ได้รับ date และ time ครบถ้วน
+        const queueWithContext = {
+            ...queue,
+            // ถ้า queue.date เป็น null/undefined ให้ใช้ selectedDate ที่เลือกอยู่
+            date: queue.date || selectedDate,
+            // ถ้าไม่มี start_time/end_time ให้ใช้จาก slot ที่เลือกอยู่
+            start_time: queue.start_time || defaultStart,
+            end_time: queue.end_time || defaultEnd,
+        };
+
+        setTicketQueue(queueWithContext);
     };
+
+    const closeTicketModal = () => setTicketQueue(null);
 
     return (
         <div
@@ -307,7 +357,7 @@ export default function BookingQueuePage({
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
-                            {/* ============= HEADER ============= */}
+                            {/* HEADER */}
                             <Group justify="space-between" align="center">
                                 <Group gap="md">
                                     <ThemeIcon
@@ -356,7 +406,7 @@ export default function BookingQueuePage({
                                 />
                             </Group>
 
-                            {/* ============= MAIN CONTENT ============= */}
+                            {/* MAIN TITLE + BUTTON */}
                             <Group justify="space-between" align="flex-end">
                                 <div>
                                     <Title
@@ -379,7 +429,7 @@ export default function BookingQueuePage({
                                     variant="filled"
                                     color={isSlotFull ? "gray" : "indigo"}
                                     onClick={handleOpenCreateBooking}
-                                    disabled={isSlotFull || nextQueueNo == null}
+                                    disabled={isSlotFull}
                                 >
                                     {isSlotFull ? "ช่วงเวลานี้เต็มแล้ว" : "+ เพิ่มการจอง"}
                                 </Button>
@@ -564,16 +614,24 @@ export default function BookingQueuePage({
                                                     {/* Details */}
                                                     <Stack gap={2} mt="xs">
                                                         <Text size="xs">
-                                                            <b>Code :</b> {q.code}
+                                                            <b>Code :</b>{" "}
+                                                            {q.supplier_code || q.code}
                                                         </Text>
                                                         <Text size="xs">
-                                                            <b>Name :</b> {q.name}
+                                                            <b>Name :</b>{" "}
+                                                            {q.supplier_name || q.name}
                                                         </Text>
                                                         <Text size="xs">
-                                                            <b>Truck :</b> {q.truck}
+                                                            <b>Truck :</b>{" "}
+                                                            {q.truck ||
+                                                                [q.truck_type, q.truck_register]
+                                                                    .filter(Boolean)
+                                                                    .join(" ")
+                                                                    .trim()}
                                                         </Text>
                                                         <Text size="xs">
-                                                            <b>Type :</b> {q.type}
+                                                            <b>Type :</b>{" "}
+                                                            {q.rubber_type || q.type}
                                                         </Text>
                                                         <Text size="xs">
                                                             <b>Recorder :</b> {q.recorder}
@@ -617,7 +675,7 @@ export default function BookingQueuePage({
                 </AppShell.Main>
             </AppShell>
 
-            {/* Drawer สำหรับ Add Booking */}
+            {/* Drawer สำหรับ Add / Edit Booking */}
             <AddBookingDrawer
                 opened={drawerOpened}
                 onClose={() => setDrawerOpened(false)}
@@ -626,6 +684,13 @@ export default function BookingQueuePage({
                     setDrawerOpened(false);
                     await fetchQueues();
                 }}
+            />
+
+            {/* Ticket Modal ตัวเดียว */}
+            <BookingTicketModal
+                opened={!!ticketQueue}
+                booking={ticketQueue}
+                onClose={closeTicketModal}
             />
         </div>
     );
