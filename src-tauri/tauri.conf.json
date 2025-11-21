@@ -3,12 +3,15 @@
   "productName": "YTRC Portal Center",
   "version": "0.1.0",
   "identifier": "com.apiwat.ytrc-portal-center",
+  "mainBinaryName": "ytrc-portal-center",
+
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
+
   "app": {
     "windows": [
       {
@@ -31,9 +34,11 @@
       }
     }
   },
+
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": "v1Compatible",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -45,18 +50,19 @@
     "category": "Productivity",
     "shortDescription": "YTRC Portal Center Desktop Application",
     "longDescription": "Internal portal for YTRC staff to manage suppliers, bookings, truck receiving, and other master data.",
-    "copyright": "Copyright © 2025",
-    "windows": {
-      "certificateThumbprint": "PUT_YOUR_CERT_THUMBPRINT_HERE",
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.digicert.com"
-    }
+    "copyright": "Copyright © 2025"
   },
+
   "plugins": {
     "updater": {
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBNjJGMUZERDJDMjlCN0IKUldSN204TFMvZkZpZWk2ZUNZeXBZeWg0aytjZ2lneTRIZStxNnRVRGRqcU1uWCtsTmJCTzYyZXoK",
-      "windows": {}
+      "windows": {
+        "endpoints": [
+          "https://database-system.ytrc.co.th/tauri-updates/ytrc-portal-center/latest.json"
+        ],
+        "installMode": "passive"
+      }
     }
   }
 }
