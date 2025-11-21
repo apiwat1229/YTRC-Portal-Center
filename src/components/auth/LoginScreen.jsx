@@ -217,7 +217,7 @@ export default function LoginScreen({ onSuccess }) {
                         <Stack gap="sm">
                             <TextInput
                                 label="Email Address"
-                                placeholder="you@example.com หรือ apiwat.s"
+                                placeholder="you@example.com หรือ username"
                                 required
                                 radius="md"
                                 value={identifier}
