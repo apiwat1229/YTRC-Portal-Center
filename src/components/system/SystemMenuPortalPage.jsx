@@ -174,8 +174,8 @@ export default function SystemMenuPortalPage({
                                     />
                                 </SimpleGrid>
 
-                                {/* Section 2: Business Master Data */}
-                                <Divider label="Purchasing Data" />
+                                {/* Section 2: Purchasing Database */}
+                                <Divider label="Purchasing Database" />
 
                                 <SimpleGrid
                                     cols={{ base: 1, sm: 2 }}

@@ -104,6 +104,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         sub_district_id: null,
         sub_district_th: "",
         zipcode: "",
+
+        remark: "", // 👈 เพิ่ม remark
     });
 
     const displayName = useMemo(() => {
@@ -290,6 +292,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     addr.subdistrict ||
                     "",
                 zipcode: addr.zipcode || addr.zip_code || "",
+
+                remark: data.remark || "", // 👈 โหลด remark จาก backend
             });
 
             if (provinceId) {
@@ -368,6 +372,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     ? Number(form.province_id)
                     : null,
             },
+            remark: form.remark || null, // 👈 ส่ง remark ไป backend
         };
 
         try {
@@ -614,7 +619,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                         {/* Row 1: Code + Title + First + Last */}
                                         <Group grow align="flex-end" wrap="wrap">
                                             <TextInput
-                                                label="Sup code *"
+                                                label="Sup code"
                                                 required
                                                 value={form.code}
                                                 onChange={(e) =>
@@ -624,10 +629,10 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                     )
                                                 }
                                                 placeholder="เช่น 0065"
-                                                disabled={isEdit}
                                             />
                                             <Select
                                                 label="คำนำหน้า"
+                                                required
                                                 placeholder="เลือกคำนำหน้า"
                                                 data={TITLE_OPTIONS}
                                                 value={form.title}
@@ -640,7 +645,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                 clearable
                                             />
                                             <TextInput
-                                                label="First name *"
+                                                label="First name"
+                                                required
                                                 value={form.first_name}
                                                 onChange={(e) =>
                                                     handleChange(
@@ -652,6 +658,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             />
                                             <TextInput
                                                 label="Last name"
+                                                required
                                                 value={form.last_name}
                                                 onChange={(e) =>
                                                     handleChange(
@@ -666,7 +673,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                         {/* Address textarea */}
                                         <Box>
                                             <Text fw={600} size="sm" mb={4}>
-                                                Address *
+                                                Address
                                             </Text>
                                             <Textarea
                                                 minRows={3}
@@ -685,6 +692,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                         <Group grow align="flex-end" wrap="wrap">
                                             <Select
                                                 label="จังหวัด"
+                                                required
                                                 placeholder="เลือกจังหวัด"
                                                 data={provinceOptions}
                                                 value={form.province_id}
@@ -739,6 +747,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             />
                                             <Select
                                                 label="อำเภอ"
+                                                required
                                                 placeholder="เลือกอำเภอ"
                                                 data={districtOptions}
                                                 value={form.district_id}
@@ -782,6 +791,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             />
                                             <Select
                                                 label="ตำบล"
+                                                required
                                                 placeholder="เลือกตำบล"
                                                 data={subDistrictOptions}
                                                 value={form.sub_district_id}
@@ -812,8 +822,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                 label="รหัสไปรษณีย์"
                                                 value={form.zipcode}
                                                 placeholder="เช่น 95000"
-                                                // ❌ ห้ามแก้ไขด้วยมือ
-                                                disabled
+                                                disabled // ห้ามแก้ไขด้วยมือ
                                             />
                                         </Group>
 
@@ -821,6 +830,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                         <Group grow align="flex-end" wrap="wrap">
                                             <InputBase
                                                 label="Phone"
+                                                required
                                                 component="input"
                                                 type="tel"
                                                 placeholder="081-234-5678"
@@ -848,6 +858,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             />
                                             <Select
                                                 label="Status"
+                                                required
                                                 data={STATUS_OPTIONS}
                                                 value={form.status}
                                                 onChange={(v) =>
@@ -862,6 +873,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                         {/* Rubber Types */}
                                         <MultiSelect
                                             label="Rubber Types"
+                                            required
                                             placeholder="เลือกประเภทยางที่เกี่ยวข้อง"
                                             data={rubberTypeOptions}
                                             value={form.rubber_type_codes}
@@ -874,6 +886,24 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             searchable
                                             clearable
                                         />
+
+                                        {/* Remark / Note */}
+                                        <Box>
+                                            <Text fw={600} size="sm" mb={4}>
+                                                Remark / Note
+                                            </Text>
+                                            <Textarea
+                                                minRows={2}
+                                                value={form.remark}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "remark",
+                                                        e.currentTarget.value
+                                                    )
+                                                }
+                                                placeholder="บันทึกโน้ตเพิ่มเติม เช่น เงื่อนไขการจ่ายเงิน, เงื่อนไขการส่งของ ฯลฯ"
+                                            />
+                                        </Box>
 
                                         {error && (
                                             <Text size="xs" c="red">
