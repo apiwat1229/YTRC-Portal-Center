@@ -85,6 +85,9 @@ export default function SupplierEditorPage({ auth, onLogout }) {
     const [districtOptions, setDistrictOptions] = useState([]);
     const [subDistrictOptions, setSubDistrictOptions] = useState([]);
 
+    // เก็บ code เดิมไว้ เผื่ออยากเช็คว่าผู้ใช้เปลี่ยนจริงไหม
+    const [originalCode, setOriginalCode] = useState("");
+
     // ฟอร์มหลัก
     const [form, setForm] = useState({
         code: "",
@@ -105,7 +108,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         sub_district_th: "",
         zipcode: "",
 
-        remark: "", // 👈 เพิ่ม remark
+        note: "", // 👈 ให้ชื่อ field ตรงกับ backend (SupplierBase.note)
     });
 
     const displayName = useMemo(() => {
@@ -261,6 +264,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
 
             const rawPhone = normalizePhoneDigits(data.phone || "");
 
+            setOriginalCode(data.code || ""); // 👈 เก็บ code เดิม
+
             setForm({
                 code: data.code || "",
                 title: data.title || "",
@@ -293,7 +298,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     "",
                 zipcode: addr.zipcode || addr.zip_code || "",
 
-                remark: data.remark || "", // 👈 โหลด remark จาก backend
+                note: data.note || "", // 👈 อ่านจาก field note ที่ backend ส่งมา
             });
 
             if (provinceId) {
@@ -344,7 +349,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
             return;
         }
 
-        const payload = {
+        // payload เต็ม ใช้ได้ทั้ง create และ edit (PATCH)
+        const basePayload = {
             code: form.code.trim(),
             title: form.title || null,
             first_name: form.first_name || null,
@@ -372,18 +378,20 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     ? Number(form.province_id)
                     : null,
             },
-            remark: form.remark || null, // 👈 ส่ง remark ไป backend
+            note: form.note || null, // 👈 ชื่อ field ตรงกับ backend
         };
 
         try {
             setLoading(true);
             let result;
+
             if (!isEdit) {
+                // CREATE → POST + ใช้ SupplierCreate
                 result = await apiRequest(
                     "/suppliers/",
                     {
                         method: "POST",
-                        body: JSON.stringify(payload),
+                        body: JSON.stringify(basePayload),
                     },
                     auth
                 );
@@ -394,11 +402,13 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     icon: <IconCheck size={16} />,
                 });
             } else {
+                // EDIT → PATCH + ใช้ SupplierUpdate
+                // ใช้ basePayload เลยได้ เพราะ SupplierUpdate รองรับ field เหล่านี้
                 result = await apiRequest(
                     `/suppliers/${supplierId}`,
                     {
                         method: "PATCH",
-                        body: JSON.stringify(payload),
+                        body: JSON.stringify(basePayload),
                     },
                     auth
                 );
@@ -894,10 +904,10 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             </Text>
                                             <Textarea
                                                 minRows={2}
-                                                value={form.remark}
+                                                value={form.note}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "remark",
+                                                        "note",
                                                         e.currentTarget.value
                                                     )
                                                 }

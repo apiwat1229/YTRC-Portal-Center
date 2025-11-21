@@ -25,6 +25,10 @@ import {
     IconArrowLeft,
     IconCheck,
     IconPlus,
+    IconUserCancel,
+    IconUserCheck,
+    IconUserPause,
+    IconUsersGroup,
     IconX,
 } from "@tabler/icons-react";
 
@@ -687,7 +691,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                         variant="light"
                                                         color="blue"
                                                     >
-                                                        <IconActivity
+                                                        <IconUsersGroup
                                                             size={16}
                                                         />
                                                     </ThemeIcon>
@@ -738,7 +742,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                         variant="light"
                                                         color="green"
                                                     >
-                                                        <IconCheck size={16} />
+                                                        <IconUserCheck size={16} />
                                                     </ThemeIcon>
                                                 </Group>
                                                 <Text
@@ -787,7 +791,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                         variant="light"
                                                         color="gray"
                                                     >
-                                                        <IconActivity
+                                                        <IconUserPause
                                                             size={16}
                                                         />
                                                     </ThemeIcon>
@@ -838,7 +842,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                         variant="light"
                                                         color="red"
                                                     >
-                                                        <IconX size={16} />
+                                                        <IconUserCancel size={16} />
                                                     </ThemeIcon>
                                                 </Group>
                                                 <Text
