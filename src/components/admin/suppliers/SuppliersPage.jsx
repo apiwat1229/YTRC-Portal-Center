@@ -72,7 +72,7 @@ export default function SuppliersPage({ auth, onLogout }) {
     const [rubberTypesMap, setRubberTypesMap] = useState({});
     const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
 
-    // สร้าง option จังหวัดสำหรับ filter
+    // province options สำหรับ address filter
     const addressOptions = useMemo(() => {
         const set = new Set();
 
@@ -116,9 +116,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                     {},
                     auth
                 );
-                setAllSuppliers(
-                    Array.isArray(supplierData) ? supplierData : []
-                );
+                setAllSuppliers(Array.isArray(supplierData) ? supplierData : []);
 
                 // rubber types (ใช้สำหรับ map ชื่อ + filter)
                 const rt = await apiRequest(`/rubber-types?limit=200`, {}, auth);
@@ -165,16 +163,14 @@ export default function SuppliersPage({ auth, onLogout }) {
 
     const handleCreate = () => {
         if (!canManageSuppliers) return;
-        // ✅ ไปหน้า Create Supplier (module cuplump)
-        navigate("/cuplump/suppliers/new");
+        navigate("/system/suppliers/new");
     };
 
     const handleEdit = (item) => {
         if (!canManageSuppliers) return;
         const id = item.id || item._id || item.supplier_id;
         if (!id) return;
-        // ✅ ไปหน้า Edit Supplier
-        navigate(`/cuplump/suppliers/${id}/edit`);
+        navigate(`/system/suppliers/${id}/edit`);
     };
 
     const handleDelete = async (item) => {
@@ -210,8 +206,6 @@ export default function SuppliersPage({ auth, onLogout }) {
     // ===== Filter ทั้งหมด (q + status + address + rubberType) =====
     const filteredSuppliers = useMemo(() => {
         const q = search.trim().toLowerCase();
-        const addrFilter = addressFilter.trim().toLowerCase();
-        const rtFilter = rubberTypeFilter;
 
         return allSuppliers.filter((s) => {
             // status
@@ -220,25 +214,21 @@ export default function SuppliersPage({ auth, onLogout }) {
             }
 
             // filter Rubber Type (เลือก code)
-            if (rtFilter) {
+            if (rubberTypeFilter) {
                 const codes = Array.isArray(s.rubber_type_codes)
                     ? s.rubber_type_codes
                     : [];
-                if (!codes.includes(rtFilter)) return false;
+                if (!codes.includes(rubberTypeFilter)) return false;
             }
 
             // filter address (จังหวัด)
-            if (addrFilter) {
+            if (addressFilter) {
                 const a = s.address || {};
                 const province =
-                    a.province_th ||
-                    a.province_en ||
-                    a.province ||
-                    a.changwat ||
-                    "";
+                    a.province_th || a.province_en || a.province || a.changwat || "";
                 if (
                     String(province).toLowerCase() !==
-                    String(addrFilter).toLowerCase()
+                    String(addressFilter).toLowerCase()
                 ) {
                     return false;
                 }
@@ -267,11 +257,10 @@ export default function SuppliersPage({ auth, onLogout }) {
                 const codes = Array.isArray(s.rubber_type_codes)
                     ? s.rubber_type_codes
                     : [];
-                const names = codes
+                return codes
                     .map((code) => rubberTypesMap[code]?.name || code)
                     .join(" ")
                     .toLowerCase();
-                return names;
             })();
 
             const fullName =
@@ -401,8 +390,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                 <Card withBorder radius="md" shadow="xs">
                                     <Stack gap="sm" align="center">
                                         <Title order={4}>
-                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล
-                                            Suppliers
+                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล Suppliers
                                         </Title>
                                         <Text size="sm" c="dimmed" ta="center">
                                             กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
@@ -504,33 +492,47 @@ export default function SuppliersPage({ auth, onLogout }) {
                             </Group>
 
                             {/* MAIN CARD */}
-                            <Card withBorder radius="md" shadow="xs">
-                                <Stack gap="sm">
-                                    {/* Title + filters + New button */}
+                            <Card
+                                withBorder
+                                radius="md"
+                                shadow="xs"
+                                p="md"
+                                pt="sm"   // ⬅ ทำให้หัวข้อชิดขอบบนมากขึ้น
+                            >
+                                <Stack gap="xs">
+                                    {/* Title block + filters อยู่บนสุดของ Card */}
                                     <Group
                                         justify="space-between"
-                                        align="flex-end"
+                                        align="flex-start"
+                                        gap="md"
                                         wrap="wrap"
                                     >
-                                        {/* ซ้าย: ชื่อ section */}
-                                        <Stack gap={2}>
-                                            <Title order={5}>Suppliers</Title>
-                                            <Text size="xs" c="dimmed">
+                                        {/* Left: Title + subtitle */}
+                                        <Box>
+                                            <Text
+                                                size="sm"
+                                                fw={600}
+                                                c="gray.8"
+                                                style={{
+                                                    letterSpacing: "0.04em",
+                                                    textTransform: "uppercase",
+                                                }}
+                                            >
+                                                Suppliers
+                                            </Text>
+                                            <Text
+                                                size="xs"
+                                                c="dimmed"
+                                                mt={2}
+                                                style={{ maxWidth: 420 }}
+                                            >
                                                 จัดการข้อมูลคู่ค้า/ผู้ส่งมอบ
                                                 สำหรับระบบรับซื้อยางและระบบคิว
                                             </Text>
-                                        </Stack>
+                                        </Box>
 
-                                        {/* กลาง: filters (กินพื้นที่ยืดหยุ่น) */}
-                                        <Group
-                                            gap="xs"
-                                            wrap="wrap"
-                                            align="flex-end"
-                                            style={{
-                                                flex: 1,
-                                                justifyContent: "flex-end",
-                                            }}
-                                        >
+                                        {/* Right: filters + New button */}
+                                        <Group gap="xs" wrap="wrap" align="flex-end">
                                             {/* Global search */}
                                             <TextInput
                                                 placeholder="ค้นหาด้วยชื่อ, code, phone, email, address, rubber type"
@@ -582,22 +584,22 @@ export default function SuppliersPage({ auth, onLogout }) {
                                                 }
                                                 searchable
                                                 clearable
-                                                style={{ width: 180 }}
+                                                style={{ width: 160 }}
                                             />
-                                        </Group>
 
-                                        {/* ขวาสุด: ปุ่ม New Supplier */}
-                                        {canManageSuppliers && (
-                                            <Button
-                                                size="xs"
-                                                leftSection={
-                                                    <IconPlus size={14} />
-                                                }
-                                                onClick={handleCreate}
-                                            >
-                                                + New Supplier
-                                            </Button>
-                                        )}
+                                            {canManageSuppliers && (
+                                                <Button
+                                                    size="xs"
+                                                    leftSection={
+                                                        <IconPlus size={14} />
+                                                    }
+                                                    onClick={handleCreate}
+                                                    style={{ marginLeft: 4 }}
+                                                >
+                                                    New Supplier
+                                                </Button>
+                                            )}
+                                        </Group>
                                     </Group>
 
                                     <Divider my="xs" />
@@ -622,7 +624,7 @@ export default function SuppliersPage({ auth, onLogout }) {
                                         />
                                     </Box>
 
-                                    {/* Footer: actions info + pagination */}
+                                    {/* Footer: summary + pagination */}
                                     <Box
                                         mt="xs"
                                         pt={8}
