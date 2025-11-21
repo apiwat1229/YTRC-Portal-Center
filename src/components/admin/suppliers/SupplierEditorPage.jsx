@@ -11,11 +11,13 @@ import {
     Container,
     Divider,
     Group,
+    InputBase,
     MultiSelect,
     Select,
     Stack,
     Text,
     TextInput,
+    Textarea,
     ThemeIcon,
     Title,
 } from "@mantine/core";
@@ -39,11 +41,28 @@ const STATUS_OPTIONS = [
 ];
 
 const TITLE_OPTIONS = [
-    { value: "Mr.", label: "Mr." },
-    { value: "Ms.", label: "Ms." },
-    { value: "Mrs.", label: "Mrs." },
+    { value: "นาย", label: "นาย" },
+    { value: "นาง", label: "นาง" },
+    { value: "นางสาว", label: "นางสาว" },
     { value: "บริษัท", label: "บริษัท" },
+    { value: "ว่าที่ ร.ต.", label: "ว่าที่ ร.ต." },
+    { value: "สหกรณ์", label: "สหกรณ์" },
+    { value: "หจก.", label: "หจก." },
 ];
+
+// helper: เก็บเลขล้วน 0-9 ไม่เกิน 11 หลัก
+const normalizePhoneDigits = (value) =>
+    (value || "").replace(/\D/g, "").slice(0, 11);
+
+// helper: แสดงผลแบบ xxx-xxxx-xxxx
+const formatPhone = (value) => {
+    const digits = normalizePhoneDigits(value);
+    if (!digits) return "";
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7)
+        return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
 
 export default function SupplierEditorPage({ auth, onLogout }) {
     const { user } = auth || {};
@@ -61,19 +80,29 @@ export default function SupplierEditorPage({ auth, onLogout }) {
 
     const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
 
+    // options: จังหวัด / อำเภอ / ตำบล
+    const [provinceOptions, setProvinceOptions] = useState([]);
+    const [districtOptions, setDistrictOptions] = useState([]);
+    const [subDistrictOptions, setSubDistrictOptions] = useState([]);
+
+    // ฟอร์มหลัก
     const [form, setForm] = useState({
         code: "",
         title: "",
         first_name: "",
         last_name: "",
-        phone: "",
+        phone: "", // เก็บเลขล้วน เช่น "0812345678"
         email: "",
         status: "active",
         rubber_type_codes: [],
+
         address_line: "",
-        sub_district_th: "",
-        district_th: "",
+        province_id: null,
         province_th: "",
+        district_id: null,
+        district_th: "",
+        sub_district_id: null,
+        sub_district_th: "",
         zipcode: "",
     });
 
@@ -95,10 +124,11 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         if (window.history.length > 1) {
             window.history.back();
         } else {
-            navigate("/cuplump/suppliers");
+            navigate("/system/suppliers");
         }
     };
 
+    // ---------- โหลด Rubber Types ----------
     const loadRubberTypes = async () => {
         try {
             const data = await apiRequest(
@@ -109,7 +139,8 @@ export default function SupplierEditorPage({ auth, onLogout }) {
             const opts = Array.isArray(data)
                 ? data.map((rt) => ({
                     value: rt.code,
-                    label: `${rt.code} · ${rt.name}`,
+                    // ให้แสดงเฉพาะ name
+                    label: rt.name || rt.code,
                 }))
                 : [];
             setRubberTypeOptions(opts);
@@ -118,6 +149,95 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         }
     };
 
+    // ---------- Thai Geo APIs ----------
+    const loadProvinces = async () => {
+        try {
+            const res = await apiRequest(
+                "/th/provinces?limit=200&sort=name_th",
+                {},
+                auth
+            );
+            const items = Array.isArray(res.items) ? res.items : res;
+
+            setProvinceOptions(
+                items.map((p) => ({
+                    value: String(p.id ?? p._id),
+                    label: p.name_th,
+                }))
+            );
+        } catch (err) {
+            console.error("[SupplierEditorPage] loadProvinces error:", err);
+            showNotification({
+                title: "โหลดจังหวัดไม่สำเร็จ",
+                message: err.message || "ไม่สามารถดึงรายการจังหวัดได้",
+                color: "red",
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const loadDistricts = async (provinceId) => {
+        if (!provinceId) {
+            setDistrictOptions([]);
+            return;
+        }
+        try {
+            const res = await apiRequest(
+                `/th/districts?province_id=${provinceId}&limit=200&sort=name_th`,
+                {},
+                auth
+            );
+            const items = Array.isArray(res.items) ? res.items : res;
+
+            setDistrictOptions(
+                items.map((d) => ({
+                    value: String(d.id ?? d._id),
+                    label: d.name_th,
+                }))
+            );
+        } catch (err) {
+            console.error("[SupplierEditorPage] loadDistricts error:", err);
+            showNotification({
+                title: "โหลดอำเภอไม่สำเร็จ",
+                message: err.message || "ไม่สามารถดึงรายการอำเภอได้",
+                color: "red",
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const loadSubDistricts = async (districtId) => {
+        if (!districtId) {
+            setSubDistrictOptions([]);
+            return;
+        }
+        try {
+            const res = await apiRequest(
+                `/th/sub-districts?district_id=${districtId}&limit=200&sort=name_th`,
+                {},
+                auth
+            );
+            const items = Array.isArray(res.items) ? res.items : res;
+
+            setSubDistrictOptions(
+                items.map((s) => ({
+                    value: String(s.id ?? s._id),
+                    label: s.name_th,
+                    zip_code: s.zip_code || "",
+                }))
+            );
+        } catch (err) {
+            console.error("[SupplierEditorPage] loadSubDistricts error:", err);
+            showNotification({
+                title: "โหลดตำบลไม่สำเร็จ",
+                message: err.message || "ไม่สามารถดึงรายการตำบลได้",
+                color: "red",
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    // ---------- โหลด Supplier ตอนแก้ไข ----------
     const loadSupplier = async () => {
         if (!isEdit || !canManageSuppliers) {
             setInitialLoaded(true);
@@ -133,12 +253,18 @@ export default function SupplierEditorPage({ auth, onLogout }) {
             );
 
             const addr = data.address || {};
+            const provinceId = addr.province_id ?? null;
+            const districtId = addr.district_id ?? null;
+            const subDistrictId = addr.sub_district_id ?? null;
+
+            const rawPhone = normalizePhoneDigits(data.phone || "");
+
             setForm({
                 code: data.code || "",
                 title: data.title || "",
                 first_name: data.first_name || "",
                 last_name: data.last_name || "",
-                phone: data.phone || "",
+                phone: rawPhone,
                 email: data.email || "",
                 status:
                     (data.status
@@ -149,18 +275,29 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                         data.rubber_type_codes.length > 0
                         ? data.rubber_type_codes
                         : [],
+
                 address_line: addr.address_line || "",
+                province_id: provinceId ? String(provinceId) : null,
+                province_th:
+                    addr.province_th || addr.province || addr.changwat || "",
+                district_id: districtId ? String(districtId) : null,
+                district_th:
+                    addr.district_th || addr.amphoe || addr.district || "",
+                sub_district_id: subDistrictId ? String(subDistrictId) : null,
                 sub_district_th:
                     addr.sub_district_th ||
                     addr.tambon ||
                     addr.subdistrict ||
                     "",
-                district_th:
-                    addr.district_th || addr.amphoe || addr.district || "",
-                province_th:
-                    addr.province_th || addr.province || addr.changwat || "",
                 zipcode: addr.zipcode || addr.zip_code || "",
             });
+
+            if (provinceId) {
+                await loadDistricts(provinceId);
+            }
+            if (districtId) {
+                await loadSubDistricts(districtId);
+            }
         } catch (err) {
             console.error("[SupplierEditorPage] loadSupplier error:", err);
             showNotification({
@@ -177,8 +314,10 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         }
     };
 
+    // ---------- useEffect ----------
     useEffect(() => {
         loadRubberTypes();
+        loadProvinces();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -187,11 +326,12 @@ export default function SupplierEditorPage({ auth, onLogout }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [supplierId]);
 
+    // ---------- Submit ----------
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
 
-        if (!form.code) {
+        if (!form.code.trim()) {
             setError("กรุณากรอก Code ของ Supplier");
             return;
         }
@@ -202,21 +342,31 @@ export default function SupplierEditorPage({ auth, onLogout }) {
 
         const payload = {
             code: form.code.trim(),
-            title: form.title || None,
-            first_name: form.first_name || None,
-            last_name: form.last_name || None,
-            phone: form.phone || None,
-            email: form.email || None,
+            title: form.title || null,
+            first_name: form.first_name || null,
+            last_name: form.last_name || null,
+            // ส่งเลขล้วนไปที่ backend
+            phone: form.phone ? normalizePhoneDigits(form.phone) : null,
+            email: form.email || null,
             status: form.status || "active",
             rubber_type_codes: Array.isArray(form.rubber_type_codes)
                 ? form.rubber_type_codes
                 : [],
             address: {
-                address_line: form.address_line || None,
-                sub_district_th: form.sub_district_th || None,
-                district_th: form.district_th || None,
-                province_th: form.province_th || None,
-                zipcode: form.zipcode || None,
+                address_line: form.address_line || null,
+                sub_district_th: form.sub_district_th || null,
+                district_th: form.district_th || null,
+                province_th: form.province_th || null,
+                zipcode: form.zipcode || null,
+                sub_district_id: form.sub_district_id
+                    ? Number(form.sub_district_id)
+                    : null,
+                district_id: form.district_id
+                    ? Number(form.district_id)
+                    : null,
+                province_id: form.province_id
+                    ? Number(form.province_id)
+                    : null,
             },
         };
 
@@ -224,7 +374,6 @@ export default function SupplierEditorPage({ auth, onLogout }) {
             setLoading(true);
             let result;
             if (!isEdit) {
-                // CREATE
                 result = await apiRequest(
                     "/suppliers/",
                     {
@@ -240,7 +389,6 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                     icon: <IconCheck size={16} />,
                 });
             } else {
-                // UPDATE
                 result = await apiRequest(
                     `/suppliers/${supplierId}`,
                     {
@@ -257,7 +405,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                 });
             }
 
-            navigate("/cuplump/suppliers");
+            navigate("/system/suppliers");
         } catch (err) {
             console.error("[SupplierEditorPage] submit error:", err);
             const msg =
@@ -359,10 +507,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                 portal.cuplump.suppliers.manage
                                             </Badge>
                                         </Text>
-                                        <Button
-                                            mt="sm"
-                                            onClick={handleGoBack}
-                                        >
+                                        <Button mt="sm" onClick={handleGoBack}>
                                             กลับไปหน้า Suppliers
                                         </Button>
                                     </Stack>
@@ -452,6 +597,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                             <Card withBorder radius="md" shadow="xs">
                                 <form onSubmit={handleSubmit}>
                                     <Stack gap="md">
+                                        {/* Title section */}
                                         <Stack gap={2}>
                                             <Title order={5}>
                                                 {isEdit
@@ -465,10 +611,10 @@ export default function SupplierEditorPage({ auth, onLogout }) {
 
                                         <Divider my="xs" />
 
-                                        {/* Row 1: Code + Status */}
-                                        <Group grow wrap="wrap">
+                                        {/* Row 1: Code + Title + First + Last */}
+                                        <Group grow align="flex-end" wrap="wrap">
                                             <TextInput
-                                                label="Code *"
+                                                label="Sup code *"
                                                 required
                                                 value={form.code}
                                                 onChange={(e) =>
@@ -477,24 +623,9 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                         e.currentTarget.value
                                                     )
                                                 }
-                                                description="รหัสประจำ Supplier เช่น SUP001"
-                                                disabled={isEdit} // โดยปกติ code ไม่ให้แก้
+                                                placeholder="เช่น 0065"
+                                                disabled={isEdit}
                                             />
-                                            <Select
-                                                label="Status"
-                                                data={STATUS_OPTIONS}
-                                                value={form.status}
-                                                onChange={(v) =>
-                                                    handleChange(
-                                                        "status",
-                                                        v || "active"
-                                                    )
-                                                }
-                                            />
-                                        </Group>
-
-                                        {/* Row 2: Title / First / Last */}
-                                        <Group grow wrap="wrap">
                                             <Select
                                                 label="คำนำหน้า"
                                                 placeholder="เลือกคำนำหน้า"
@@ -509,7 +640,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                 clearable
                                             />
                                             <TextInput
-                                                label="ชื่อ"
+                                                label="First name *"
                                                 value={form.first_name}
                                                 onChange={(e) =>
                                                     handleChange(
@@ -517,9 +648,10 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                         e.currentTarget.value
                                                     )
                                                 }
+                                                placeholder="ชื่อ"
                                             />
                                             <TextInput
-                                                label="นามสกุล"
+                                                label="Last name"
                                                 value={form.last_name}
                                                 onChange={(e) =>
                                                     handleChange(
@@ -527,18 +659,179 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                         e.currentTarget.value
                                                     )
                                                 }
+                                                placeholder="นามสกุล"
                                             />
                                         </Group>
 
-                                        {/* Row 3: Phone / Email */}
-                                        <Group grow wrap="wrap">
+                                        {/* Address textarea */}
+                                        <Box>
+                                            <Text fw={600} size="sm" mb={4}>
+                                                Address *
+                                            </Text>
+                                            <Textarea
+                                                minRows={3}
+                                                value={form.address_line}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "address_line",
+                                                        e.currentTarget.value
+                                                    )
+                                                }
+                                                placeholder="บ้านเลขที่, หมู่, ถนน ฯลฯ"
+                                            />
+                                        </Box>
+
+                                        {/* Row: Province / District / Sub-district / Zip */}
+                                        <Group grow align="flex-end" wrap="wrap">
+                                            <Select
+                                                label="จังหวัด"
+                                                placeholder="เลือกจังหวัด"
+                                                data={provinceOptions}
+                                                value={form.province_id}
+                                                onChange={(val) => {
+                                                    const option =
+                                                        provinceOptions.find(
+                                                            (p) =>
+                                                                p.value === val
+                                                        );
+                                                    handleChange(
+                                                        "province_id",
+                                                        val
+                                                    );
+                                                    handleChange(
+                                                        "province_th",
+                                                        option?.label || ""
+                                                    );
+                                                    // reset lower level
+                                                    handleChange(
+                                                        "district_id",
+                                                        null
+                                                    );
+                                                    handleChange(
+                                                        "district_th",
+                                                        ""
+                                                    );
+                                                    handleChange(
+                                                        "sub_district_id",
+                                                        null
+                                                    );
+                                                    handleChange(
+                                                        "sub_district_th",
+                                                        ""
+                                                    );
+                                                    handleChange("zipcode", "");
+                                                    if (val) {
+                                                        loadDistricts(
+                                                            Number(val)
+                                                        );
+                                                        setSubDistrictOptions(
+                                                            []
+                                                        );
+                                                    } else {
+                                                        setDistrictOptions([]);
+                                                        setSubDistrictOptions(
+                                                            []
+                                                        );
+                                                    }
+                                                }}
+                                                searchable
+                                                clearable
+                                            />
+                                            <Select
+                                                label="อำเภอ"
+                                                placeholder="เลือกอำเภอ"
+                                                data={districtOptions}
+                                                value={form.district_id}
+                                                onChange={(val) => {
+                                                    const option =
+                                                        districtOptions.find(
+                                                            (d) =>
+                                                                d.value === val
+                                                        );
+                                                    handleChange(
+                                                        "district_id",
+                                                        val
+                                                    );
+                                                    handleChange(
+                                                        "district_th",
+                                                        option?.label || ""
+                                                    );
+                                                    // reset ตำบล
+                                                    handleChange(
+                                                        "sub_district_id",
+                                                        null
+                                                    );
+                                                    handleChange(
+                                                        "sub_district_th",
+                                                        ""
+                                                    );
+                                                    handleChange("zipcode", "");
+                                                    if (val) {
+                                                        loadSubDistricts(
+                                                            Number(val)
+                                                        );
+                                                    } else {
+                                                        setSubDistrictOptions(
+                                                            []
+                                                        );
+                                                    }
+                                                }}
+                                                searchable
+                                                clearable
+                                                disabled={!form.province_id}
+                                            />
+                                            <Select
+                                                label="ตำบล"
+                                                placeholder="เลือกตำบล"
+                                                data={subDistrictOptions}
+                                                value={form.sub_district_id}
+                                                onChange={(val) => {
+                                                    const option =
+                                                        subDistrictOptions.find(
+                                                            (s) =>
+                                                                s.value === val
+                                                        );
+                                                    handleChange(
+                                                        "sub_district_id",
+                                                        val
+                                                    );
+                                                    handleChange(
+                                                        "sub_district_th",
+                                                        option?.label || ""
+                                                    );
+                                                    handleChange(
+                                                        "zipcode",
+                                                        option?.zip_code || ""
+                                                    );
+                                                }}
+                                                searchable
+                                                clearable
+                                                disabled={!form.district_id}
+                                            />
                                             <TextInput
-                                                label="เบอร์โทร"
-                                                value={form.phone}
+                                                label="รหัสไปรษณีย์"
+                                                value={form.zipcode}
+                                                placeholder="เช่น 95000"
+                                                // ❌ ห้ามแก้ไขด้วยมือ
+                                                disabled
+                                            />
+                                        </Group>
+
+                                        {/* Row: Phone / Email / Status */}
+                                        <Group grow align="flex-end" wrap="wrap">
+                                            <InputBase
+                                                label="Phone"
+                                                component="input"
+                                                type="tel"
+                                                placeholder="081-234-5678"
+                                                value={formatPhone(form.phone)}
                                                 onChange={(e) =>
                                                     handleChange(
                                                         "phone",
-                                                        e.currentTarget.value
+                                                        normalizePhoneDigits(
+                                                            e.currentTarget
+                                                                .value
+                                                        )
                                                     )
                                                 }
                                             />
@@ -553,12 +846,23 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                                     )
                                                 }
                                             />
+                                            <Select
+                                                label="Status"
+                                                data={STATUS_OPTIONS}
+                                                value={form.status}
+                                                onChange={(v) =>
+                                                    handleChange(
+                                                        "status",
+                                                        v || "active"
+                                                    )
+                                                }
+                                            />
                                         </Group>
 
                                         {/* Rubber Types */}
                                         <MultiSelect
-                                            label="Rubber Types ที่เกี่ยวข้อง"
-                                            placeholder="เลือกประเภทของยาง"
+                                            label="Rubber Types"
+                                            placeholder="เลือกประเภทยางที่เกี่ยวข้อง"
                                             data={rubberTypeOptions}
                                             value={form.rubber_type_codes}
                                             onChange={(v) =>
@@ -569,84 +873,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             }
                                             searchable
                                             clearable
-                                            description="ใช้สำหรับผูก Supplier กับประเภทยางที่อนุญาตให้ซื้อขาย"
                                         />
-
-                                        {/* Address */}
-                                        <Box>
-                                            <Title order={6} mb={4}>
-                                                Address
-                                            </Title>
-                                            <Stack gap="xs">
-                                                <TextInput
-                                                    label="ที่อยู่ (บรรทัดหลัก)"
-                                                    value={form.address_line}
-                                                    onChange={(e) =>
-                                                        handleChange(
-                                                            "address_line",
-                                                            e.currentTarget
-                                                                .value
-                                                        )
-                                                    }
-                                                />
-                                                <Group grow wrap="wrap">
-                                                    <TextInput
-                                                        label="ตำบล"
-                                                        value={
-                                                            form.sub_district_th
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleChange(
-                                                                "sub_district_th",
-                                                                e
-                                                                    .currentTarget
-                                                                    .value
-                                                            )
-                                                        }
-                                                    />
-                                                    <TextInput
-                                                        label="อำเภอ"
-                                                        value={
-                                                            form.district_th
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleChange(
-                                                                "district_th",
-                                                                e
-                                                                    .currentTarget
-                                                                    .value
-                                                            )
-                                                        }
-                                                    />
-                                                    <TextInput
-                                                        label="จังหวัด"
-                                                        value={
-                                                            form.province_th
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleChange(
-                                                                "province_th",
-                                                                e
-                                                                    .currentTarget
-                                                                    .value
-                                                            )
-                                                        }
-                                                    />
-                                                    <TextInput
-                                                        label="รหัสไปรษณีย์"
-                                                        value={form.zipcode}
-                                                        onChange={(e) =>
-                                                            handleChange(
-                                                                "zipcode",
-                                                                e
-                                                                    .currentTarget
-                                                                    .value
-                                                            )
-                                                        }
-                                                    />
-                                                </Group>
-                                            </Stack>
-                                        </Box>
 
                                         {error && (
                                             <Text size="xs" c="red">
@@ -654,10 +881,7 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             </Text>
                                         )}
 
-                                        <Group
-                                            justify="flex-end"
-                                            mt="sm"
-                                        >
+                                        <Group justify="flex-end" mt="sm">
                                             <Button
                                                 variant="default"
                                                 onClick={handleGoBack}
@@ -666,7 +890,9 @@ export default function SupplierEditorPage({ auth, onLogout }) {
                                             </Button>
                                             <Button
                                                 type="submit"
-                                                loading={loading && initialLoaded}
+                                                loading={
+                                                    loading && initialLoaded
+                                                }
                                             >
                                                 {isEdit
                                                     ? "บันทึกการเปลี่ยนแปลง"
