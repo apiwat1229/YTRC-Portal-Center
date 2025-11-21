@@ -3,17 +3,16 @@
   "productName": "YTRC Portal Center",
   "version": "0.1.0",
   "identifier": "com.apiwat.ytrc-portal-center",
-
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
-
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "YTRC Portal Center",
         "width": 1440,
         "height": 900,
@@ -23,7 +22,8 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "devtools": true
       }
     ],
     "security": {
@@ -33,11 +33,9 @@
       }
     }
   },
-
   "bundle": {
     "active": true,
     "targets": "all",
-
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -45,18 +43,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-
     "publisher": "Y.T Rubber Co., Ltd.",
     "category": "Productivity",
     "shortDescription": "YTRC Portal Center Desktop Application",
     "longDescription": "Internal portal for YTRC staff to manage suppliers, bookings, truck receiving, and other master data.",
     "copyright": "Copyright © 2025",
-
     "windows": {
       "digestAlgorithm": "sha256"
     }
   },
-
   "plugins": {
     "updater": {
       "active": true,
