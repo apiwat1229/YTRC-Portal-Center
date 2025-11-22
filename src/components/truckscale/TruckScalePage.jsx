@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 
 import UserHeaderPanel from "../common/UserHeaderPanel";
 import BookingCheckInTab from "./BookingCheckInTab";
-import DrainMonitorTab from "./DrainMonitorTab";
+import WeightScaleOutTab from "./WeightScaleOutTab";
 import WeightScaleInTab from "./WeightScaleInTab";
 import WeightSummaryTab from "./WeightSummaryTab";
 
@@ -144,7 +144,7 @@ export default function TruckScalePage({
 
                                 <Tabs.Panel value="drain_monitor" pt="md">
                                     <PanelWrapper>
-                                        <DrainMonitorTab user={user} />
+                                        <WeightScaleOutTab user={user} />
                                     </PanelWrapper>
                                 </Tabs.Panel>
 
