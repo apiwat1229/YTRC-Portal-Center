@@ -1,3 +1,4 @@
+// src-tauri/src/lib.rs
 use tauri::{Builder, Manager};
 
 #[tauri::command]
@@ -11,14 +12,13 @@ pub fn run() {
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
-                // แก้ไขจุดนี้: ใน Tauri V2 ต้องใช้ get_webview_window แทน get_window
+                // ใน Tauri V2 ต้องใช้ get_webview_window แทน get_window
                 if let Some(main_window) = app.get_webview_window("main") {
                     main_window.open_devtools();
                 }
             }
             Ok(())
         })
-        // Plugins ที่คุณเพิ่ง cargo add มาจะทำงานได้ถูกต้องตรงนี้
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
