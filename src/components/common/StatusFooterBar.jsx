@@ -1,30 +1,40 @@
 // src/components/common/StatusFooterBar.jsx
 import { http } from "@/helpers/http";
-import { Card, Group, Text } from "@mantine/core";
-import { IconCpu, IconServer } from "@tabler/icons-react";
+import { Button, Card, Group, Text, Tooltip } from "@mantine/core";
+import { modals } from "@mantine/modals";
+import { IconCpu, IconRefresh, IconServer } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 
 // ✅ ดึงเวอร์ชันจาก tauri.conf.json
-// ระวัง path ให้ตรงกับโครงสร้างโปรเจกต์จริง ๆ
 import tauriConf from "../../../src-tauri/tauri.conf.json";
 
-// ใน tauri.conf.json ใช้ field "version" ด้านบนสุด
-// ถ้าอยากให้มีตัว v นำหน้า → ค่อยเติมเอง
+// helper เช็ค / ติดตั้งอัปเดต (ต้องมีไฟล์นี้)
+import {
+    fetchAvailableUpdate,
+    installUpdate,
+} from "@/tauri-updater";
+
+// version จาก tauri.conf.json
 const APP_VERSION_FROM_TAURI = tauriConf?.version
-    ? `v${tauriConf.version}` // จะได้ v0.1.0
-    : "v.0.1.0-stable";
+    ? `v${tauriConf.version}`
+    : "v0.1.0-stable";
+
+// guard กันไม่ให้เช็คซ้ำซ้อน (ช่วยลดโอกาสเด้งซ้ำ)
+let isCheckingUpdateGlobal = false;
 
 export default function StatusFooterBar({
     statusLabel = "Service status",
-    version = APP_VERSION_FROM_TAURI, // ใช้ค่าจาก Tauri เป็นค่าเริ่มต้น
+    version = APP_VERSION_FROM_TAURI,
     latency: initialLatency = "—",
-    healthEndpoint = "/healthz", // ตรงกับ https://database-system.ytrc.co.th/api/healthz
+    healthEndpoint = "/healthz",
     pollIntervalMs = 30000,
 }) {
     const [status, setStatus] = useState("checking"); // checking | online | degraded | offline
     const [currentVersion, setCurrentVersion] = useState(version);
     const [latency, setLatency] = useState(initialLatency);
     const [label, setLabel] = useState(statusLabel);
+
+    const [checkingUpdate, setCheckingUpdate] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -43,7 +53,6 @@ export default function StatusFooterBar({
 
                 const data = resp?.data || {};
 
-                // /healthz ตอนนี้ส่ง { ok: true, api: "api" }
                 if (
                     data.ok === true ||
                     data.status === "ok" ||
@@ -56,7 +65,6 @@ export default function StatusFooterBar({
                     setLabel("Service responding");
                 }
 
-                // ถ้าวันหนึ่ง BE ส่ง version กลับมา → ให้มีสิทธิ์ override
                 if (data.app_version || data.version) {
                     setCurrentVersion(data.app_version || data.version);
                 } else {
@@ -71,10 +79,9 @@ export default function StatusFooterBar({
             }
         };
 
-        // ping ครั้งแรกตอน mount
+        // ping ครั้งแรก
         ping();
 
-        // ตั้ง interval ถ้ากำหนด
         if (pollIntervalMs > 0) {
             timer = setInterval(ping, pollIntervalMs);
         }
@@ -85,7 +92,7 @@ export default function StatusFooterBar({
         };
     }, [healthEndpoint, pollIntervalMs]);
 
-    // เลือกสีตามสถานะ
+    // สีสถานะ
     let statusColor = "#a1a1aa";
     let statusShadow = "0 0 6px rgba(148,163,184,0.6)";
 
@@ -99,6 +106,100 @@ export default function StatusFooterBar({
         statusColor = "#ef4444";
         statusShadow = "0 0 8px #ef4444";
     }
+
+    // === ปุ่ม Check for updates ===
+    const handleCheckUpdateClick = async () => {
+        // ถ้าไม่ได้รันใน Tauri (เช่น เปิดผ่าน browser) ให้แจ้งครั้งเดียว
+        if (!window.__TAURI__) {
+            modals.open({
+                title: "Desktop updater only",
+                children: (
+                    <Text size="sm">
+                        Auto-update ใช้ได้เฉพาะใน desktop app
+                        (Tauri) เท่านั้น
+                    </Text>
+                ),
+            });
+            return;
+        }
+
+        // กันไม่ให้ยิงซ้ำ (ทั้งใน component และกรณีมี footer ซ้ำ)
+        if (checkingUpdate || isCheckingUpdateGlobal) {
+            return;
+        }
+
+        setCheckingUpdate(true);
+        isCheckingUpdateGlobal = true;
+
+        try {
+            const update = await fetchAvailableUpdate();
+
+            // ลองเคลียร์ Modal เดิม ๆ (กันเคสมี Modal ค้างอยู่)
+            modals.closeAll();
+
+            if (!update) {
+                // ไม่มีอัปเดต → แสดงแค่ 1 Modal
+                modals.open({
+                    title: "No updates available",
+                    children: (
+                        <Text size="sm">
+                            ตอนนี้คุณใช้เวอร์ชันล่าสุดแล้ว ({currentVersion})
+                        </Text>
+                    ),
+                });
+                return;
+            }
+
+            // มีอัปเดต → เปิด Confirm แค่ครั้งเดียว
+            modals.openConfirmModal({
+                title: `Update available (${update.version})`,
+                children: (
+                    <Text size="sm">
+                        พบเวอร์ชันใหม่: <b>{update.version}</b>
+                        <br />
+                        ต้องการดาวน์โหลดและติดตั้งตอนนี้เลยหรือไม่?
+                    </Text>
+                ),
+                labels: {
+                    confirm: "Download & Install",
+                    cancel: "Later",
+                },
+                confirmProps: {
+                    color: "blue",
+                },
+                onConfirm: async () => {
+                    try {
+                        await installUpdate(update);
+                    } catch (err) {
+                        console.error("[installUpdate] error", err);
+                        modals.open({
+                            title: "Update failed",
+                            children: (
+                                <Text size="sm">
+                                    ไม่สามารถติดตั้งอัปเดตได้:
+                                    {" " + (err?.message || "Unknown error")}
+                                </Text>
+                            ),
+                        });
+                    }
+                },
+            });
+        } catch (err) {
+            console.error("[checkUpdate] error", err);
+            modals.open({
+                title: "Update check failed",
+                children: (
+                    <Text size="sm">
+                        เช็คอัปเดตไม่สำเร็จ:
+                        {" " + (err?.message || "Unknown error")}
+                    </Text>
+                ),
+            });
+        } finally {
+            setCheckingUpdate(false);
+            isCheckingUpdateGlobal = false;
+        }
+    };
 
     return (
         <Card
@@ -140,9 +241,25 @@ export default function StatusFooterBar({
                     </Group>
                 </Group>
 
-                <Text size="xs" c="dimmed">
-                    © 2025 YTRC. All rights reserved.
-                </Text>
+                <Group gap="sm">
+                    {/* ปุ่ม Check for updates */}
+                    <Tooltip label="ตรวจสอบเวอร์ชันใหม่ของ Portal Desktop">
+                        <Button
+                            size="xs"
+                            variant="light"
+                            radius="xl"
+                            leftSection={<IconRefresh size={14} />}
+                            loading={checkingUpdate}
+                            onClick={handleCheckUpdateClick}
+                        >
+                            {checkingUpdate ? "Checking..." : "Check for updates"}
+                        </Button>
+                    </Tooltip>
+
+                    <Text size="xs" c="dimmed">
+                        © 2025 YTRC. All rights reserved.
+                    </Text>
+                </Group>
             </Group>
         </Card>
     );
