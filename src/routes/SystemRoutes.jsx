@@ -15,6 +15,9 @@ import SuppliersPage from "../components/admin/suppliers/SuppliersPage";
 // ✅ Truck Scale main page (มี Tabs ด้านใน)
 import TruckScalePage from "@/components/truckscale/TruckScalePage";
 
+// ✅ QR System main portal
+import QrPortalPage from "@/components/qr/QrPortalPage";
+
 // ✅ ใช้ตัวเดียวกับ PortalCenterPage
 import { can } from "../components/auth/permission";
 
@@ -125,7 +128,7 @@ export function renderSystemRoutes({ auth, onLogout }) {
                     <RubberTypesPage
                         auth={auth}
                         onLogout={onLogout}
-                    // ถ้าอยากให้กด Back กลับ System Menu ก็ส่ง navigate ผ่าน prop ภายหลังได้
+                    // ถ้าอยากให้ back ได้ในอนาคต สามารถเพิ่ม onBack prop ได้
                     />,
                 )}
             />
@@ -157,7 +160,10 @@ export function renderSystemRoutes({ auth, onLogout }) {
                 path="/system/suppliers"
                 element={requireAuthElement(
                     auth,
-                    <SuppliersPage auth={auth} onLogout={onLogout} />,
+                    <SuppliersPage
+                        auth={auth}
+                        onLogout={onLogout}
+                    />,
                 )}
             />
 
@@ -165,7 +171,10 @@ export function renderSystemRoutes({ auth, onLogout }) {
                 path="/system/suppliers/new"
                 element={requireAuthElement(
                     auth,
-                    <SupplierEditorPage auth={auth} onLogout={onLogout} />,
+                    <SupplierEditorPage
+                        auth={auth}
+                        onLogout={onLogout}
+                    />,
                 )}
             />
 
@@ -173,7 +182,10 @@ export function renderSystemRoutes({ auth, onLogout }) {
                 path="/system/suppliers/:supplierId/edit"
                 element={requireAuthElement(
                     auth,
-                    <SupplierEditorPage auth={auth} onLogout={onLogout} />,
+                    <SupplierEditorPage
+                        auth={auth}
+                        onLogout={onLogout}
+                    />,
                 )}
             />
 
@@ -201,6 +213,31 @@ export function renderSystemRoutes({ auth, onLogout }) {
                         />
                     ) : (
                         // ถ้าไม่มีสิทธิ์ → ส่งกลับหน้าแรก
+                        <Navigate to="/" replace />
+                    ),
+                )}
+            />
+
+            {/* ===== QR SYSTEM (หน้าใหม่ /qr – Main Portal) ===== */}
+            <Route
+                path="/qr"
+                element={requireAuthElement(
+                    auth,
+                    can(user, "portal.app.qr.view") ? (
+                        <QrPortalPage
+                            auth={auth}
+                            onLogout={onLogout}
+                            onBack={() => {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    window.location.href = "/";
+                                }
+                            }}
+                            onNotificationsClick={() => { }}
+                            notificationsCount={0}
+                        />
+                    ) : (
                         <Navigate to="/" replace />
                     ),
                 )}
