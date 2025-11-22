@@ -5,21 +5,14 @@ import { modals } from "@mantine/modals";
 import { IconCpu, IconRefresh, IconServer } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 
-// ✅ ดึงเวอร์ชันจาก tauri.conf.json
+import { fetchAvailableUpdate, installUpdate } from "@/tauri-updater";
 import tauriConf from "../../../src-tauri/tauri.conf.json";
 
-// helper เช็ค / ติดตั้งอัปเดต (ต้องมีไฟล์นี้)
-import {
-    fetchAvailableUpdate,
-    installUpdate,
-} from "@/tauri-updater";
-
-// version จาก tauri.conf.json
 const APP_VERSION_FROM_TAURI = tauriConf?.version
     ? `v${tauriConf.version}`
     : "v0.1.0-stable";
 
-// guard กันไม่ให้เช็คซ้ำซ้อน (ช่วยลดโอกาสเด้งซ้ำ)
+// กันซ้ำตอนเช็คอัปเดต
 let isCheckingUpdateGlobal = false;
 
 export default function StatusFooterBar({
@@ -29,11 +22,10 @@ export default function StatusFooterBar({
     healthEndpoint = "/healthz",
     pollIntervalMs = 30000,
 }) {
-    const [status, setStatus] = useState("checking"); // checking | online | degraded | offline
+    const [status, setStatus] = useState("checking");
     const [currentVersion, setCurrentVersion] = useState(version);
     const [latency, setLatency] = useState(initialLatency);
     const [label, setLabel] = useState(statusLabel);
-
     const [checkingUpdate, setCheckingUpdate] = useState(false);
 
     useEffect(() => {
@@ -79,7 +71,6 @@ export default function StatusFooterBar({
             }
         };
 
-        // ping ครั้งแรก
         ping();
 
         if (pollIntervalMs > 0) {
@@ -92,7 +83,6 @@ export default function StatusFooterBar({
         };
     }, [healthEndpoint, pollIntervalMs]);
 
-    // สีสถานะ
     let statusColor = "#a1a1aa";
     let statusShadow = "0 0 6px rgba(148,163,184,0.6)";
 
@@ -107,26 +97,21 @@ export default function StatusFooterBar({
         statusShadow = "0 0 8px #ef4444";
     }
 
-    // === ปุ่ม Check for updates ===
     const handleCheckUpdateClick = async () => {
-        // ถ้าไม่ได้รันใน Tauri (เช่น เปิดผ่าน browser) ให้แจ้งครั้งเดียว
-        if (!window.__TAURI__) {
+        // ไม่ใช่ Tauri → แจ้งเตือนครั้งเดียวแล้วจบ
+        if (typeof window === "undefined" || !window.__TAURI__) {
             modals.open({
                 title: "Desktop updater only",
                 children: (
                     <Text size="sm">
-                        Auto-update ใช้ได้เฉพาะใน desktop app
-                        (Tauri) เท่านั้น
+                        Auto-update ใช้ได้เฉพาะใน desktop app (Tauri) เท่านั้น
                     </Text>
                 ),
             });
             return;
         }
 
-        // กันไม่ให้ยิงซ้ำ (ทั้งใน component และกรณีมี footer ซ้ำ)
-        if (checkingUpdate || isCheckingUpdateGlobal) {
-            return;
-        }
+        if (checkingUpdate || isCheckingUpdateGlobal) return;
 
         setCheckingUpdate(true);
         isCheckingUpdateGlobal = true;
@@ -134,11 +119,10 @@ export default function StatusFooterBar({
         try {
             const update = await fetchAvailableUpdate();
 
-            // ลองเคลียร์ Modal เดิม ๆ (กันเคสมี Modal ค้างอยู่)
+            // เผื่อมี modal ค้างอยู่ก่อนหน้า
             modals.closeAll();
 
             if (!update) {
-                // ไม่มีอัปเดต → แสดงแค่ 1 Modal
                 modals.open({
                     title: "No updates available",
                     children: (
@@ -150,7 +134,6 @@ export default function StatusFooterBar({
                 return;
             }
 
-            // มีอัปเดต → เปิด Confirm แค่ครั้งเดียว
             modals.openConfirmModal({
                 title: `Update available (${update.version})`,
                 children: (
@@ -160,13 +143,8 @@ export default function StatusFooterBar({
                         ต้องการดาวน์โหลดและติดตั้งตอนนี้เลยหรือไม่?
                     </Text>
                 ),
-                labels: {
-                    confirm: "Download & Install",
-                    cancel: "Later",
-                },
-                confirmProps: {
-                    color: "blue",
-                },
+                labels: { confirm: "Download & Install", cancel: "Later" },
+                confirmProps: { color: "blue" },
                 onConfirm: async () => {
                     try {
                         await installUpdate(update);
@@ -176,8 +154,8 @@ export default function StatusFooterBar({
                             title: "Update failed",
                             children: (
                                 <Text size="sm">
-                                    ไม่สามารถติดตั้งอัปเดตได้:
-                                    {" " + (err?.message || "Unknown error")}
+                                    ไม่สามารถติดตั้งอัปเดตได้:{" "}
+                                    {err?.message || "Unknown error"}
                                 </Text>
                             ),
                         });
@@ -190,8 +168,8 @@ export default function StatusFooterBar({
                 title: "Update check failed",
                 children: (
                     <Text size="sm">
-                        เช็คอัปเดตไม่สำเร็จ:
-                        {" " + (err?.message || "Unknown error")}
+                        เช็คอัปเดตไม่สำเร็จ:{" "}
+                        {err?.message || "Unknown error"}
                     </Text>
                 ),
             });
@@ -242,7 +220,6 @@ export default function StatusFooterBar({
                 </Group>
 
                 <Group gap="sm">
-                    {/* ปุ่ม Check for updates */}
                     <Tooltip label="ตรวจสอบเวอร์ชันใหม่ของ Portal Desktop">
                         <Button
                             size="xs"

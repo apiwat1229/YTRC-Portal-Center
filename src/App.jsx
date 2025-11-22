@@ -20,25 +20,49 @@ import {
 
 import { renderSystemRoutes } from "./routes/SystemRoutes";
 
-// 👇 Mantine
-import { Badge, MantineProvider, Stack, Text } from "@mantine/core";
-import { ModalsProvider, modals } from "@mantine/modals";
+// Mantine UI (ใช้แค่ components ไม่ต้องห่อ Provider ในไฟล์นี้แล้ว)
+import { Badge, Stack, Text } from "@mantine/core";
+import { modals } from "@mantine/modals";
 
-// 👇 Tauri updater helpers
+// Tauri updater helpers
 import {
   fetchAvailableUpdate,
   installUpdate,
 } from "./tauri-updater";
 
+// --- กัน useEffect เช็คอัปเดตยิงซ้ำใน process เดียวกัน (เช่น StrictMode / HMR) ---
+let hasRunInitialUpdateCheck = false;
+
 export default function App() {
-  // === เช็คอัปเดตตอนแอปเปิด + แสดง Mantine Modal ===
+  // ===== Auth state / error state =====
+  const [auth, setAuth] = useState(() => loadAuth());
+  const [appError, setAppError] = useState(null);
+
+  // ===== เช็คอัปเดตตอนแอปเปิด (เฉพาะใน Tauri) =====
   useEffect(() => {
+    // ป้องกันไม่ให้เช็คซ้ำใน process เดียว
+    if (hasRunInitialUpdateCheck) {
+      return;
+    }
+    hasRunInitialUpdateCheck = true;
+
     async function runUpdateCheck() {
+      // ถ้าไม่ใช่ Tauri (เช่น เปิดผ่าน browser) ให้ข้ามไปเลย
+      if (
+        typeof window === "undefined" ||
+        !("__TAURI_INTERNALS__" in window)
+      ) {
+        console.log("[updater] Not running inside Tauri, skip initial check.");
+        return;
+      }
+
       const update = await fetchAvailableUpdate();
       if (!update) return;
 
       const version = update.version || "New version";
-      const body = update.body || "This version includes improvements and bug fixes.";
+      const body =
+        update.body ||
+        "This version includes improvements and bug fixes.";
 
       modals.openConfirmModal({
         title: (
@@ -86,7 +110,6 @@ export default function App() {
         },
         onConfirm: async () => {
           try {
-            // สามารถแทรก loading state แบบง่าย ๆ ด้วย alert หรือ toast ก็ได้
             await installUpdate(update);
           } catch (err) {
             console.error("[updater] install error:", err);
@@ -110,86 +133,82 @@ export default function App() {
     runUpdateCheck();
   }, []);
 
-  // ==== Auth state / error state ====
-  const [auth, setAuth] = useState(() => loadAuth());
-  const [appError, setAppError] = useState(null);
-
+  // ===== login สำเร็จ =====
   const handleLoginSuccess = (data) => {
     setAuth(data);
-    saveAuth(data);
+    saveAuth(data); // เก็บ session ลง localStorage
   };
 
+  // ===== logout =====
   const handleLogout = () => {
     clearAuth();
     setAuth(null);
   };
 
   return (
-    <MantineProvider defaultColorScheme="light">
-      <ModalsProvider>
-        <BrowserRouter>
-          {/* BG เดียวทั้งแอป (ใช้ร่วมกับ .app-bg ใน CSS) */}
-          <div className="app-bg">
-            <Routes>
-              {/* ===== หน้า Login ===== */}
-              <Route
-                path="/login"
-                element={
-                  auth ? (
-                    <Navigate to="/" replace />
-                  ) : (
-                    <div
-                      style={{
-                        minHeight: "100vh",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <LoginScreen onSuccess={handleLoginSuccess} />
-                    </div>
-                  )
-                }
+    <BrowserRouter>
+      {/* BG เดียวทั้งแอป (ใช้ร่วมกับ .app-bg ใน CSS) */}
+      <div className="app-bg">
+        <Routes>
+          {/* ===== หน้า Login ===== */}
+          <Route
+            path="/login"
+            element={
+              auth ? (
+                // ถ้า login แล้วแต่ดันเข้าหน้า /login → เด้งกลับไป /
+                <Navigate to="/" replace />
+              ) : (
+                // ใช้ flex center ให้ Login อยู่กลางจอ แต่ BG ใช้จาก .app-bg
+                <div
+                  style={{
+                    minHeight: "100vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <LoginScreen onSuccess={handleLoginSuccess} />
+                </div>
+              )
+            }
+          />
+
+          {/* ===== หน้า Portal Center หลัก (หลัง login) ===== */}
+          <Route
+            path="/"
+            element={
+              auth ? (
+                <PortalCenterPage
+                  auth={auth}
+                  onLogout={handleLogout}
+                  onError={setAppError}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* ===== กลุ่ม /system (import จาก SystemRoutes.jsx) ===== */}
+          {renderSystemRoutes({ auth, onLogout: handleLogout })}
+
+          {/* ===== Error 500 (แสดง error กลาง ๆ) ===== */}
+          <Route
+            path="/error"
+            element={
+              <Error500Page
+                message={appError}
+                onRetry={() => {
+                  window.location.href = "/";
+                }}
               />
+            }
+          />
 
-              {/* ===== หน้า Portal Center หลัก (หลัง login) ===== */}
-              <Route
-                path="/"
-                element={
-                  auth ? (
-                    <PortalCenterPage
-                      auth={auth}
-                      onLogout={handleLogout}
-                      onError={setAppError}
-                    />
-                  ) : (
-                    <Navigate to="/login" replace />
-                  )
-                }
-              />
-
-              {/* ===== กลุ่ม /system (import จาก SystemRoutes.jsx) ===== */}
-              {renderSystemRoutes({ auth, onLogout: handleLogout })}
-
-              {/* ===== Error 500 ===== */}
-              <Route
-                path="/error"
-                element={
-                  <Error500Page
-                    message={appError}
-                    onRetry={() => {
-                      window.location.href = "/";
-                    }}
-                  />
-                }
-              />
-
-              {/* ===== 404 ===== */}
-              <Route path="*" element={<Error404Page />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </ModalsProvider>
-    </MantineProvider>
+          {/* ===== 404: path ที่ไม่ตรงอะไรเลย ===== */}
+          <Route path="*" element={<Error404Page />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }

@@ -8,15 +8,15 @@ import { check } from "@tauri-apps/plugin-updater";
  * - ถ้าไม่มี: return null
  */
 export async function fetchAvailableUpdate() {
-    try {
-        // กันกรณีรันบน web (npm run dev) ที่ไม่ใช่ Tauri
-        if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
-            console.log("[updater] Not running inside Tauri, skip update check.");
-            return null;
-        }
+    // กันกรณีรันบนเว็บ (npm run dev) ที่ไม่ใช่ Tauri
+    if (typeof window === "undefined" || !window.__TAURI__) {
+        console.log("[updater] Not running inside Tauri, skip update check.");
+        return null;
+    }
 
+    try {
         console.log("[updater] Checking for updates...");
-        const update = await check();
+        const update = await check(); // จาก tauri-plugin-updater
 
         if (!update?.available) {
             console.log("[updater] No updates available.");
@@ -28,6 +28,17 @@ export async function fetchAvailableUpdate() {
         // update.version = เวอร์ชันใหม่จาก latest.json
         return update;
     } catch (err) {
+        const msg = String(err?.message || err || "");
+
+        // ถ้ายังไม่ได้เปิด permission updater → ไม่ต้องโยน error ออกมาให้รก
+        if (msg.includes("updater.check not allowed")) {
+            console.warn(
+                "[updater] updater.check not allowed – check src-tauri/capabilities/default.json",
+                err
+            );
+            return null;
+        }
+
         console.error("[updater] Failed to check update:", err);
         return null;
     }

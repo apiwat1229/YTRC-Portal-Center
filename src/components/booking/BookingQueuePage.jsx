@@ -31,7 +31,6 @@ import {
 
 import { http } from "@/helpers/http";
 import { IconCheck, IconTrashX } from "@tabler/icons-react";
-import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
 import AddBookingDrawer from "./AddBookingDrawer";
 import BookingTicketModal from "./BookingTicketModal";
@@ -755,11 +754,6 @@ export default function BookingQueuePage({
                                 </SimpleGrid>
                             )}
 
-                            <StatusFooterBar
-                                statusLabel="Service Online"
-                                version="v0.1.0"
-                                latency="21ms"
-                            />
                         </Stack>
                     </Container>
                 </AppShell.Main>
