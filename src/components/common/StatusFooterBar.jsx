@@ -19,7 +19,7 @@ const APP_VERSION_FROM_TAURI = tauriConf?.version
     ? `v${tauriConf.version}`
     : "v0.1.0-stable";
 
-// guard กันไม่ให้เช็คซ้ำซ้อน (ช่วยลดโอกาสเด้งซ้ำ)
+// guard กันไม่ให้เช็คซ้ำซ้อน (ช่วยลดโอกาสยิงซ้ำจาก click spam หรือมี footer หลายตัว)
 let isCheckingUpdateGlobal = false;
 
 export default function StatusFooterBar({
@@ -111,7 +111,7 @@ export default function StatusFooterBar({
     }
 
     // -----------------------------
-    // ปุ่ม Check for updates
+    // ปุ่ม Check for updates (manual)
     // -----------------------------
     const handleCheckUpdateClick = async () => {
         // ✅ ใช้ helper กลางจาก tauri-updater
@@ -157,6 +157,10 @@ export default function StatusFooterBar({
             // มีอัปเดต → เปิด Confirm ให้ยืนยัน
             modals.openConfirmModal({
                 title: `Update available (${update.version})`,
+                centered: true,
+                closeOnClickOutside: false,
+                closeOnEscape: false,
+                withCloseButton: false,
                 children: (
                     <Text size="sm">
                         พบเวอร์ชันใหม่: <b>{update.version}</b>

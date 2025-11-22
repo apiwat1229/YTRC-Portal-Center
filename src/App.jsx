@@ -21,7 +21,6 @@ import {
 import { renderSystemRoutes } from "./routes/SystemRoutes";
 
 // Mantine (ใช้ component + modals อย่างเดียว)
-// Provider ทั้งหมดไปห่อใน main.jsx แล้ว
 import { Badge, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 
@@ -29,28 +28,31 @@ import { modals } from "@mantine/modals";
 import {
   fetchAvailableUpdate,
   installUpdate,
-  isTauriEnv, // 👈 ใช้ helper เดียวกันทุกที่
+  isTauriEnv, // 👈 helper เช็คว่ารันใน Tauri ไหม
 } from "./tauri-updater";
 
 // --- กัน useEffect เช็คอัปเดตยิงซ้ำใน process เดียวกัน (เช่น StrictMode / HMR) ---
 let hasRunInitialUpdateCheck = false;
+
+// --- กันไม่ให้แจ้งเตือน version เดิมซ้ำ ๆ ใน session เดียวกัน ---
+let lastUpdateVersionNotified = null;
 
 export default function App() {
   // ===== Auth state / error state =====
   const [auth, setAuth] = useState(() => loadAuth());
   const [appError, setAppError] = useState(null);
 
-  // ===== เช็คอัปเดตตอนแอปเปิด (เฉพาะใน Tauri) =====
+  // ===== เช็คอัปเดตตอนแอปเปิด + ทุก 1 นาที (เฉพาะใน Tauri) =====
   useEffect(() => {
     if (hasRunInitialUpdateCheck) {
       return;
     }
     hasRunInitialUpdateCheck = true;
 
-    async function runUpdateCheck() {
-      // ใช้ helper จาก tauri-updater แทนเขียนเอง
+    // ฟังก์ชันกลาง: เช็คอัปเดต + ถ้ามี → แสดง Modal
+    async function checkUpdateAndShowModal() {
+      // ถ้าไม่ใช่ Tauri (เช่น เปิดผ่าน browser) ให้ข้าม
       if (!isTauriEnv()) {
-        console.log("[updater] Not running inside Tauri, skip initial check.");
         return;
       }
 
@@ -59,6 +61,13 @@ export default function App() {
         if (!update) return;
 
         const version = update.version || "New version";
+
+        // ถ้า version เดิมที่เคยแจ้งแล้ว → ไม่ต้องเด้งซ้ำ
+        if (lastUpdateVersionNotified === version) {
+          return;
+        }
+        lastUpdateVersionNotified = version;
+
         const body =
           update.body ||
           "This version includes improvements and bug fixes.";
@@ -82,6 +91,12 @@ export default function App() {
           ),
           centered: true,
           radius: "md",
+
+          // ⛔ ห้ามปิดด้วยการคลิกนอก / กด Esc / ปุ่มกากบาท
+          closeOnClickOutside: false,
+          closeOnEscape: false,
+          withCloseButton: false,
+
           children: (
             <Stack gap="xs">
               <Text size="sm">
@@ -128,11 +143,19 @@ export default function App() {
           },
         });
       } catch (err) {
-        console.error("[updater] initial check error:", err);
+        console.error("[updater] initial/interval check error:", err);
       }
     }
 
-    runUpdateCheck();
+    // ✅ เช็คครั้งแรกตอนเปิดแอป
+    checkUpdateAndShowModal();
+
+    // ✅ ตั้ง interval เช็คทุก 1 นาที
+    const intervalId = setInterval(checkUpdateAndShowModal, 60_000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, []);
 
   // ===== login สำเร็จ =====
