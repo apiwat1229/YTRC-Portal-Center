@@ -35,6 +35,7 @@ import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
 import AddBookingDrawer from "./AddBookingDrawer";
 import BookingTicketModal from "./BookingTicketModal";
+
 // ===== config slot เวลาให้เหมือน BE =====
 const SLOT_OPTIONS = [
     { label: "08:00 - 09:00", value: "08:00-09:00" },
@@ -100,34 +101,65 @@ function parseQueueDate(dateField) {
     return new Date();
 }
 
+/** helper: เช็คว่า string ไหน “ดูเหมือน” 10 ล้อพ่วง */
+function isTrailerLike(text = "") {
+    const s = String(text).trim();
+    if (!s) return false;
+    // รองรับ 10 ล้อ พ่วง / 10ล้อพ่วง / 10 ล้อ (พ่วง)
+    return /10\s*ล้อ\s*(\(\s*พ่วง\s*\)|พ่วง)/.test(s);
+}
+
+/** normalize truck type ให้ใช้ค่าภายในระบบเดียวกัน */
+function normalizeTruckType(t) {
+    const s = String(t || "").trim();
+    if (!s) return "";
+    if (isTrailerLike(s)) {
+        // ค่า value ที่เราตั้งใน <Select> (AddBookingDrawer) คือ "10 ล้อ พ่วง"
+        return "10 ล้อ พ่วง";
+    }
+    return s;
+}
+
 // type ที่เรารองรับ (เอาไว้ใช้ split string ที่มาจาก field truck ตัวเดียว เช่น "6 ล้อ 123456")
-const KNOWN_TRUCK_TYPES = ["6 ล้อ", "10 ล้อ", "10 ล้อ พ่วง", "เทรลเลอร์"];
+const KNOWN_TRUCK_TYPES = ["6 ล้อ", "10 ล้อ", "เทรลเลอร์"];
 
 // แยก truck_type + license_plate จาก queue object
 function extractTruckFields(q) {
-    let truck_type = q.truck_type || "";
-    let license_plate = q.truck_register || q.license_plate || "";
+    // เริ่มจาก field ปกติที่ BE ส่งมา
+    let truck_type = normalizeTruckType(q?.truck_type || "");
+    let license_plate = q?.truck_register || q?.license_plate || "";
 
-    const rawTruck = (q.truck || "").toString().trim();
+    const rawTruck = (q?.truck || "").toString().trim();
+    let plateFromRaw = "";
 
     // ถ้ายังไม่มี truck_type แต่มีข้อความรวมอยู่ใน truck ให้ลอง split
     if (!truck_type && rawTruck) {
-        const matchedType = KNOWN_TRUCK_TYPES.find((t) =>
-            rawTruck.startsWith(t),
-        );
-        if (matchedType) {
-            truck_type = matchedType;
-            const rest = rawTruck.slice(matchedType.length).trim();
-            if (!license_plate && rest) {
-                license_plate = rest;
+        // กรณีเป็น 10 ล้อพ่วง (มีหรือไม่มีวงเล็บ)
+        if (isTrailerLike(rawTruck)) {
+            truck_type = "10 ล้อ พ่วง";
+            plateFromRaw = rawTruck.replace(
+                /10\s*ล้อ\s*(\(\s*พ่วง\s*\)|พ่วง)/,
+                "",
+            ).trim();
+        } else {
+            const matchedType = KNOWN_TRUCK_TYPES.find((t) =>
+                rawTruck.startsWith(t),
+            );
+            if (matchedType) {
+                truck_type = normalizeTruckType(matchedType);
+                plateFromRaw = rawTruck.slice(matchedType.length).trim();
             }
-        } else if (!license_plate) {
-            // กรณีไม่รู้รูปแบบ type → เก็บทั้งก้อนเป็นป้ายทะเบียนแทน
-            license_plate = rawTruck;
         }
     }
 
-    return { truck_type, license_plate };
+    if (!license_plate && plateFromRaw) {
+        license_plate = plateFromRaw;
+    }
+
+    return {
+        truck_type: normalizeTruckType(truck_type),
+        license_plate,
+    };
 }
 
 export default function BookingQueuePage({
@@ -199,7 +231,10 @@ export default function BookingQueuePage({
 
         let candidate = slotConfig.start;
         while (true) {
-            if (!slotConfig.limit || candidate < slotConfig.start + slotConfig.limit) {
+            if (
+                !slotConfig.limit ||
+                candidate < slotConfig.start + slotConfig.limit
+            ) {
                 if (!used.includes(candidate)) {
                     return candidate;
                 }
@@ -283,7 +318,7 @@ export default function BookingQueuePage({
                 ? (queue.slot || selectedSlot).split("-")
                 : [queue.start_time, queue.end_time];
 
-        // 🔧 ใช้ helper แยก Truck Type + License Plate ออกจากค่าเก่า
+        // ใช้ helper แยก Truck Type + License Plate ออกจากค่าเก่า
         const { truck_type, license_plate } = extractTruckFields(queue);
 
         setDrawerDefaults({
@@ -294,8 +329,8 @@ export default function BookingQueuePage({
             end_time: endTime || "",
             supplier_code: queue.supplier_code || queue.code || "",
             supplier_name: queue.supplier_name || queue.name || "",
-            truck_type,                             // <<-- type ที่แยกได้
-            truck_register: license_plate || "",    // <<-- ส่งไปเป็น truck_register
+            truck_type, // *** ถูก normalize แล้ว → "10 ล้อ พ่วง"
+            truck_register: license_plate || "",
             rubber_type: queue.rubber_type || queue.type || "",
             booking_code: queue.booking_code || "",
             queue_no: queue.queue_no,
@@ -326,7 +361,6 @@ export default function BookingQueuePage({
             await http.delete(`/bookings/${id}`);
             await fetchQueues();
 
-            // ✅ แจ้งเตือนลบสำเร็จ
             notifications.show({
                 title: "ลบคิวสำเร็จ",
                 message: `ลบคิวหมายเลข ${queue.queue_no ?? "-"} เรียบร้อยแล้ว`,
@@ -342,7 +376,6 @@ export default function BookingQueuePage({
                 err?.message ||
                 "ลบคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
 
-            // ❌ แจ้งเตือนลบไม่สำเร็จ
             notifications.show({
                 title: "ลบคิวไม่สำเร็จ",
                 message: String(backendMsg),

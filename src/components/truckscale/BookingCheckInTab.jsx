@@ -89,14 +89,39 @@ const formatDateTimeFriendly = (val) => {
     return `${formatDateEN(local)} ${hh}:${mm}`;
 };
 
-// truck type options (เติม "กระบะ")
+// ===== Truck type helpers (ให้ตรงกับฝั่ง Booking) =====
+function isTrailerLike(text = "") {
+    const s = String(text).trim();
+    if (!s) return false;
+    // รองรับ "10 ล้อ (พ่วง)", "10 ล้อ พ่วง", "10ล้อพ่วง"
+    return /10\s*ล้อ\s*(\(\s*พ่วง\s*\)|พ่วง)/.test(s);
+}
+
+function normalizeTruckType(t) {
+    const s = String(t || "").trim();
+    if (!s) return "";
+    if (isTrailerLike(s)) {
+        // internal value ใช้แบบเดียวกับ AddBookingDrawer
+        return "10 ล้อ พ่วง";
+    }
+    return s;
+}
+
+// truck type options (value = internal, label = ที่โชว์บนจอ)
 const TRUCK_TYPE_OPTIONS = [
     { value: "กระบะ", label: "กระบะ" },
     { value: "6 ล้อ", label: "6 ล้อ" },
     { value: "10 ล้อ", label: "10 ล้อ" },
-    { value: "10 ล้อ (พ่วง)", label: "10 ล้อ (พ่วง)" },
+    { value: "10 ล้อ พ่วง", label: "10 ล้อ (พ่วง)" },
     { value: "เทรลเลอร์", label: "เทรลเลอร์" },
 ];
+
+const getTruckLabel = (value) => {
+    if (!value) return "-";
+    const norm = normalizeTruckType(value);
+    const found = TRUCK_TYPE_OPTIONS.find((opt) => opt.value === norm);
+    return found?.label || norm || "-";
+};
 
 /** แถวแสดงรายละเอียดซ้ายชื่อ ขวาค่า */
 function DetailRow({ label, value, bold = false, alignRight = false }) {
@@ -172,7 +197,8 @@ export default function BookingCheckInTab({ user }) {
             setBooking(found);
 
             if (found.truck_type) {
-                setTruckType(found.truck_type);
+                // ✅ normalize ก่อน set เข้า Select
+                setTruckType(normalizeTruckType(found.truck_type));
             } else {
                 setTruckType(null);
             }
@@ -239,7 +265,7 @@ export default function BookingCheckInTab({ user }) {
         };
 
         if (checkerName) payload.checker = checkerName;
-        if (truckType) payload.truck_type = truckType;
+        if (truckType) payload.truck_type = normalizeTruckType(truckType);
         if (truckPlate) payload.truck_register = truckPlate;
         if (note.trim()) payload.note = note.trim();
 
@@ -395,7 +421,9 @@ export default function BookingCheckInTab({ user }) {
                                 />
                                 <DetailRow
                                     label="Truck"
-                                    value={booking.truck_type || "-"}
+                                    value={getTruckLabel(
+                                        booking.truck_type || truckType,
+                                    )}
                                     bold
                                     alignRight
                                 />
@@ -419,7 +447,7 @@ export default function BookingCheckInTab({ user }) {
                                             background: "#ffffffff",
                                             border: "1px solid #4ADE80",
                                             fontSize: 11,
-                                            textAlign: "center",   // <<— ตรงนี้
+                                            textAlign: "center",
                                         }}
                                     >
                                         <Text size="xs" c="green.9">
@@ -480,7 +508,9 @@ export default function BookingCheckInTab({ user }) {
                                 placeholder="เลือกประเภท"
                                 data={TRUCK_TYPE_OPTIONS}
                                 value={truckType}
-                                onChange={setTruckType}
+                                onChange={(val) =>
+                                    setTruckType(normalizeTruckType(val || ""))
+                                }
                                 allowDeselect
                                 size="sm"
                             />

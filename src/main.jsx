@@ -38,7 +38,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       }}
     >
       <ModalsProvider>
-        <Notifications position="top-right" />
+        <Notifications position="bottom-right" />
         <App />
       </ModalsProvider>
     </DatesProvider>

@@ -16,7 +16,6 @@ import {
 import { DateInput } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
 
-
 import { IconCalendar, IconCheck, IconX } from "@tabler/icons-react";
 
 import { http } from "@/helpers/http";
@@ -30,6 +29,23 @@ function genBookingCode(dateObj, queueNo) {
     const datePart = d.format("YYMMDD");
     const q = String(queueNo).padStart(2, "0");
     return `${datePart}${q}`;
+}
+
+// ===== helper: ให้ truck_type เก่า/ใหม่ map มาเป็นค่าเดียวกัน =====
+function isTrailerLike(text = "") {
+    const s = String(text).trim();
+    if (!s) return false;
+    return /10\s*ล้อ\s*(\(\s*พ่วง\s*\)|พ่วง)/.test(s);
+}
+
+function normalizeTruckType(t) {
+    const s = String(t || "").trim();
+    if (!s) return "";
+    if (isTrailerLike(s)) {
+        // internal value ของ select
+        return "10 ล้อ พ่วง";
+    }
+    return s;
 }
 
 /**
@@ -103,7 +119,8 @@ export default function AddBookingDrawer({
             supplier_code: base.supplier_code || "",
             supplier_name: base.supplier_name || "",
 
-            truck_type: base.truck_type || "",
+            // *** normalize truck_type ให้ตรงกับ options ของ Select ***
+            truck_type: normalizeTruckType(base.truck_type || ""),
             // ตอน edit เราส่งมาในชื่อ truck_register
             license_plate: base.truck_register || base.license_plate || "",
 
@@ -280,7 +297,6 @@ export default function AddBookingDrawer({
             );
 
             if (isEditMode && bookingId) {
-                // ✅ ใช้ PUT ให้ตรงกับ backend (เดิมใช้ PATCH แล้ว 405)
                 await http.put(`/bookings/${bookingId}`, payload);
             } else {
                 await http.post("/bookings", payload);
@@ -402,12 +418,18 @@ export default function AddBookingDrawer({
                                     { value: "กระบะ", label: "กระบะ" },
                                     { value: "6 ล้อ", label: "6 ล้อ" },
                                     { value: "10 ล้อ", label: "10 ล้อ" },
-                                    { value: "10 ล้อ พ่วง", label: "10 ล้อ (พ่วง)" },
+                                    {
+                                        value: "10 ล้อ พ่วง",
+                                        label: "10 ล้อ (พ่วง)",
+                                    },
                                     { value: "เทรลเลอร์", label: "เทรลเลอร์" },
                                 ]}
                                 value={form.truck_type}
                                 onChange={(val) =>
-                                    updateForm("truck_type", val || "")
+                                    updateForm(
+                                        "truck_type",
+                                        normalizeTruckType(val || ""),
+                                    )
                                 }
                             />
                         </Grid.Col>
