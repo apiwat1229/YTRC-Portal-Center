@@ -183,7 +183,22 @@ export function renderSystemRoutes({ auth, onLogout }) {
                 element={requireAuthElement(
                     auth,
                     can(user, "portal.app.booking.view") ? (
-                        <BookingQueuePage auth={auth} onLogout={onLogout} />
+                        <BookingQueuePage
+                            auth={auth}
+                            onLogout={onLogout}
+                            // ✅ ใส่ onBack ให้เหมือนหน้าอื่น
+                            onBack={() => {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    // ถ้าไม่มี history ให้กลับหน้า Portal Center
+                                    window.location.href = "/";
+                                }
+                            }}
+                            // ✅ ส่ง prop สำหรับ Notification (ตอนนี้ยังเป็น function เปล่า ๆ ไปก่อน)
+                            onNotificationsClick={() => { }}
+                            notificationsCount={0}
+                        />
                     ) : (
                         // ถ้าไม่มีสิทธิ์ → ส่งกลับหน้าแรก
                         <Navigate to="/" replace />

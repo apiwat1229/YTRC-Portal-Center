@@ -211,6 +211,7 @@ export default function BookingQueuePage({
 
     const effectiveNotificationsCount = notificationsCount;
 
+
     // ===== คำนวณคิวตาม slot & จำนวนคิวใน slot ปัจจุบัน =====
     const slotConfig = useMemo(
         () => getSlotConfig(selectedSlot),
@@ -488,7 +489,7 @@ export default function BookingQueuePage({
                                 <UserHeaderPanel
                                     user={user}
                                     displayName={displayName}
-                                    onBackClick={onBack}
+                                    onBackClick={onBack} 
                                     onNotificationsClick={onNotificationsClick}
                                     onLogout={onLogout}
                                     notificationsCount={effectiveNotificationsCount}
