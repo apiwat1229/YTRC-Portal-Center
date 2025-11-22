@@ -471,10 +471,10 @@ export default function BookingQueuePage({
                                     >
                                         Queue Overview
                                     </Title>
-                                    <Text size="sm" c="dimmed">
+                                    <Text size="sm">
                                         เลือกวันที่และช่วงเวลาเพื่อดูสถานะการจองคิวรถบรรทุก
                                     </Text>
-                                    <Text size="xs" c="dimmed" mt={4}>
+                                    <Text size="xs" mt={4}>
                                         {displayRange} • {slotQueueRangeLabel}
                                     </Text>
                                 </div>
