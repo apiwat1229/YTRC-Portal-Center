@@ -20,7 +20,8 @@ import {
 
 import { renderSystemRoutes } from "./routes/SystemRoutes";
 
-// Mantine UI (ใช้แค่ components ไม่ต้องห่อ Provider ในไฟล์นี้แล้ว)
+// Mantine (ใช้ component + modals อย่างเดียว)
+// Provider ทั้งหมดไปห่อใน main.jsx แล้ว
 import { Badge, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 
@@ -28,6 +29,7 @@ import { modals } from "@mantine/modals";
 import {
   fetchAvailableUpdate,
   installUpdate,
+  isTauriEnv, // 👈 ใช้ helper เดียวกันทุกที่
 } from "./tauri-updater";
 
 // --- กัน useEffect เช็คอัปเดตยิงซ้ำใน process เดียวกัน (เช่น StrictMode / HMR) ---
@@ -40,94 +42,94 @@ export default function App() {
 
   // ===== เช็คอัปเดตตอนแอปเปิด (เฉพาะใน Tauri) =====
   useEffect(() => {
-    // ป้องกันไม่ให้เช็คซ้ำใน process เดียว
     if (hasRunInitialUpdateCheck) {
       return;
     }
     hasRunInitialUpdateCheck = true;
 
     async function runUpdateCheck() {
-      // ถ้าไม่ใช่ Tauri (เช่น เปิดผ่าน browser) ให้ข้ามไปเลย
-      if (
-        typeof window === "undefined" ||
-        !("__TAURI_INTERNALS__" in window)
-      ) {
+      // ใช้ helper จาก tauri-updater แทนเขียนเอง
+      if (!isTauriEnv()) {
         console.log("[updater] Not running inside Tauri, skip initial check.");
         return;
       }
 
-      const update = await fetchAvailableUpdate();
-      if (!update) return;
+      try {
+        const update = await fetchAvailableUpdate();
+        if (!update) return;
 
-      const version = update.version || "New version";
-      const body =
-        update.body ||
-        "This version includes improvements and bug fixes.";
+        const version = update.version || "New version";
+        const body =
+          update.body ||
+          "This version includes improvements and bug fixes.";
 
-      modals.openConfirmModal({
-        title: (
-          <Stack gap={4}>
-            <Text fw={600} size="sm">
-              พบอัปเดตใหม่สำหรับ YTRC Portal Center
-            </Text>
-            <Badge
-              size="xs"
-              radius="sm"
-              variant="light"
-              color="blue"
-              style={{ width: "fit-content" }}
-            >
-              เวอร์ชัน {version}
-            </Badge>
-          </Stack>
-        ),
-        centered: true,
-        radius: "md",
-        children: (
-          <Stack gap="xs">
-            <Text size="sm">
-              มีเวอร์ชันใหม่พร้อมให้อัปเดตแล้ว รายละเอียดเวอร์ชันนี้:
-            </Text>
-            <Text size="sm" style={{ whiteSpace: "pre-line" }}>
-              {body}
-            </Text>
-            <Text size="xs" c="dimmed">
-              คุณสามารถกดอัปเดตตอนนี้ ระบบจะดาวน์โหลดและรีสตาร์ตแอปอัตโนมัติ
-            </Text>
-          </Stack>
-        ),
-        labels: {
-          confirm: "อัปเดตตอนนี้",
-          cancel: "ไว้ทีหลัง",
-        },
-        confirmProps: {
-          color: "blue",
+        modals.openConfirmModal({
+          title: (
+            <Stack gap={4}>
+              <Text fw={600} size="sm">
+                พบอัปเดตใหม่สำหรับ YTRC Portal Center
+              </Text>
+              <Badge
+                size="xs"
+                radius="sm"
+                variant="light"
+                color="blue"
+                style={{ width: "fit-content" }}
+              >
+                เวอร์ชัน {version}
+              </Badge>
+            </Stack>
+          ),
+          centered: true,
           radius: "md",
-        },
-        cancelProps: {
-          variant: "subtle",
-          radius: "md",
-        },
-        onConfirm: async () => {
-          try {
-            await installUpdate(update);
-          } catch (err) {
-            console.error("[updater] install error:", err);
-            modals.open({
-              title: "อัปเดตไม่สำเร็จ",
-              centered: true,
-              children: (
-                <Text size="sm">
-                  ไม่สามารถติดตั้งอัปเดตได้ กรุณาลองใหม่อีกครั้ง หรือแจ้ง IT.
-                </Text>
-              ),
-            });
-          }
-        },
-        onCancel: () => {
-          console.log("[updater] User chose to update later.");
-        },
-      });
+          children: (
+            <Stack gap="xs">
+              <Text size="sm">
+                มีเวอร์ชันใหม่พร้อมให้อัปเดตแล้ว รายละเอียดเวอร์ชันนี้:
+              </Text>
+              <Text size="sm" style={{ whiteSpace: "pre-line" }}>
+                {body}
+              </Text>
+              <Text size="xs" c="dimmed">
+                คุณสามารถกดอัปเดตตอนนี้ ระบบจะดาวน์โหลดและรีสตาร์ตแอปอัตโนมัติ
+              </Text>
+            </Stack>
+          ),
+          labels: {
+            confirm: "อัปเดตตอนนี้",
+            cancel: "ไว้ทีหลัง",
+          },
+          confirmProps: {
+            color: "blue",
+            radius: "md",
+          },
+          cancelProps: {
+            variant: "subtle",
+            radius: "md",
+          },
+          onConfirm: async () => {
+            try {
+              await installUpdate(update);
+            } catch (err) {
+              console.error("[updater] install error:", err);
+              modals.open({
+                title: "อัปเดตไม่สำเร็จ",
+                centered: true,
+                children: (
+                  <Text size="sm">
+                    ไม่สามารถติดตั้งอัปเดตได้ กรุณาลองใหม่อีกครั้ง หรือแจ้ง IT.
+                  </Text>
+                ),
+              });
+            }
+          },
+          onCancel: () => {
+            console.log("[updater] User chose to update later.");
+          },
+        });
+      } catch (err) {
+        console.error("[updater] initial check error:", err);
+      }
     }
 
     runUpdateCheck();
@@ -155,10 +157,8 @@ export default function App() {
             path="/login"
             element={
               auth ? (
-                // ถ้า login แล้วแต่ดันเข้าหน้า /login → เด้งกลับไป /
                 <Navigate to="/" replace />
               ) : (
-                // ใช้ flex center ให้ Login อยู่กลางจอ แต่ BG ใช้จาก .app-bg
                 <div
                   style={{
                     minHeight: "100vh",
@@ -189,10 +189,10 @@ export default function App() {
             }
           />
 
-          {/* ===== กลุ่ม /system (import จาก SystemRoutes.jsx) ===== */}
+          {/* ===== กลุ่ม /system ===== */}
           {renderSystemRoutes({ auth, onLogout: handleLogout })}
 
-          {/* ===== Error 500 (แสดง error กลาง ๆ) ===== */}
+          {/* ===== Error 500 ===== */}
           <Route
             path="/error"
             element={
@@ -205,7 +205,7 @@ export default function App() {
             }
           />
 
-          {/* ===== 404: path ที่ไม่ตรงอะไรเลย ===== */}
+          {/* ===== 404 ===== */}
           <Route path="*" element={<Error404Page />} />
         </Routes>
       </div>

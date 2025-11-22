@@ -3,20 +3,30 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 
 /**
+ * ตรวจว่าโค้ดกำลังรันอยู่ใน Tauri หรือไม่
+ */
+export function isTauriEnv() {
+    return (
+        typeof window !== "undefined" &&
+        // Tauri v2 จะมีตัวนี้เสมอใน window
+        "__TAURI_INTERNALS__" in window
+    );
+}
+
+/**
  * ใช้เช็คว่ามีอัปเดตไหม
  * - ถ้ามี: return update object
  * - ถ้าไม่มี: return null
  */
 export async function fetchAvailableUpdate() {
-    // กันกรณีรันบนเว็บ (npm run dev) ที่ไม่ใช่ Tauri
-    if (typeof window === "undefined" || !window.__TAURI__) {
-        console.log("[updater] Not running inside Tauri, skip update check.");
-        return null;
-    }
-
     try {
+        if (!isTauriEnv()) {
+            console.log("[updater] Not running inside Tauri, skip update check.");
+            return null;
+        }
+
         console.log("[updater] Checking for updates...");
-        const update = await check(); // จาก tauri-plugin-updater
+        const update = await check();
 
         if (!update?.available) {
             console.log("[updater] No updates available.");
@@ -24,21 +34,8 @@ export async function fetchAvailableUpdate() {
         }
 
         console.log("[updater] Update available:", update);
-        // update.body = notes จาก latest.json
-        // update.version = เวอร์ชันใหม่จาก latest.json
         return update;
     } catch (err) {
-        const msg = String(err?.message || err || "");
-
-        // ถ้ายังไม่ได้เปิด permission updater → ไม่ต้องโยน error ออกมาให้รก
-        if (msg.includes("updater.check not allowed")) {
-            console.warn(
-                "[updater] updater.check not allowed – check src-tauri/capabilities/default.json",
-                err
-            );
-            return null;
-        }
-
         console.error("[updater] Failed to check update:", err);
         return null;
     }
