@@ -1,6 +1,6 @@
 // src/components/booking/AddBookingDrawer.jsx
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     Button,
@@ -14,7 +14,10 @@ import {
     TextInput,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
-import { IconCalendar } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
+
+
+import { IconCalendar, IconCheck, IconX } from "@tabler/icons-react";
 
 import { http } from "@/helpers/http";
 
@@ -30,12 +33,12 @@ function genBookingCode(dateObj, queueNo) {
 }
 
 /**
- * Drawer สำหรับ Add Booking
+ * Drawer สำหรับ Add / Edit Booking
  *
  * props:
  *  - opened: boolean
  *  - onClose: () => void
- *  - defaults: { start_time, end_time, date, queue_no, recorder }
+ *  - defaults: ข้อมูลเริ่มต้น / ข้อมูล booking ที่จะ edit
  *  - onSuccess: () => void
  */
 export default function AddBookingDrawer({
@@ -62,12 +65,27 @@ export default function AddBookingDrawer({
     const [supplierOptions, setSupplierOptions] = useState([]);
     const [rubberTypeOptions, setRubberTypeOptions] = useState([]);
 
+    // ==== เช็คว่าเป็นโหมดแก้ไขไหม (มี id ใน defaults) ====
+    const bookingId = useMemo(
+        () => defaults?.id || defaults?._id || defaults?.booking_id || null,
+        [defaults],
+    );
+    const isEditMode = !!bookingId;
+
     // ==== ตั้งค่า default เมื่อเปิด Drawer ====
     useEffect(() => {
         if (!opened) return;
 
         const base = defaults || {};
-        const date = base.date || new Date();
+
+        // date จาก defaults อาจเป็น string → แปลงเป็น Date ให้
+        const date =
+            base.date instanceof Date
+                ? base.date
+                : base.date
+                    ? new Date(base.date)
+                    : new Date();
+
         const queueNo = base.queue_no ?? 1;
 
         setForm((prev) => ({
@@ -75,17 +93,26 @@ export default function AddBookingDrawer({
             start_time: base.start_time || "08:00",
             end_time: base.end_time || "09:00",
             date,
-            booking_code: genBookingCode(date, queueNo),
+            // edit mode → ใช้ booking_code เดิม
+            // create mode → gen ใหม่จาก date + queue_no
+            booking_code:
+                base.booking_code ||
+                (queueNo ? genBookingCode(date, queueNo) : ""),
             queue_no: String(queueNo),
-            supplier_code: "",
-            supplier_name: "",
-            truck_type: "",
-            license_plate: "",
-            rubber_type: "",
-            rubber_type_name: "",
+
+            supplier_code: base.supplier_code || "",
+            supplier_name: base.supplier_name || "",
+
+            truck_type: base.truck_type || "",
+            // ตอน edit เราส่งมาในชื่อ truck_register
+            license_plate: base.truck_register || base.license_plate || "",
+
+            rubber_type: base.rubber_type || "",
+            rubber_type_name: base.rubber_type_name || "",
+
             recorder: base.recorder || "",
         }));
-    }, [opened, defaults]);
+    }, [opened, defaults, isEditMode]);
 
     // ==== โหลด Suppliers + RubberTypes เมื่อเปิด Drawer ====
     useEffect(() => {
@@ -122,7 +149,6 @@ export default function AddBookingDrawer({
                         s.name ||
                         "";
 
-                    // Supplier: แสดง 1229-ชื่อเต็ม
                     const label = [code, name].filter(Boolean).join("-");
 
                     return {
@@ -173,10 +199,9 @@ export default function AddBookingDrawer({
                         r.description ||
                         "";
 
-                    // ❗ Type: ให้แสดงเฉพาะ label = name
                     return {
-                        value: code,                 // ส่ง code ไปให้ BE
-                        label: name || code || "-",  // UI เห็นแค่ชื่อ
+                        value: code,                // ส่ง code ไปให้ BE
+                        label: name || code || "-", // UI เห็นแค่ชื่อ
                         rawName: name,
                     };
                 });
@@ -206,8 +231,8 @@ export default function AddBookingDrawer({
         setForm((prev) => {
             const next = { ...prev, [field]: value };
 
-            // booking code เปลี่ยนเฉพาะตอนเปลี่ยน date (queue_no มาจาก BE อย่างเดียว)
-            if (field === "date") {
+            // booking code เปลี่ยนเฉพาะตอนเปลี่ยน date และเป็นโหมด create เท่านั้น
+            if (field === "date" && !isEditMode) {
                 if (next.date && next.queue_no) {
                     next.booking_code = genBookingCode(next.date, next.queue_no);
                 }
@@ -248,13 +273,44 @@ export default function AddBookingDrawer({
                 recorder: form.recorder || undefined,
             };
 
-            console.log("[AddBookingDrawer] create payload:", payload);
-            await http.post("/bookings", payload);
+            console.log(
+                "[AddBookingDrawer] payload:",
+                isEditMode ? "update" : "create",
+                payload,
+            );
+
+            if (isEditMode && bookingId) {
+                // ✅ ใช้ PUT ให้ตรงกับ backend (เดิมใช้ PATCH แล้ว 405)
+                await http.put(`/bookings/${bookingId}`, payload);
+            } else {
+                await http.post("/bookings", payload);
+            }
+
+            notifications.show({
+                title: isEditMode ? "Update Booking สำเร็จ" : "Create Booking สำเร็จ",
+                message: isEditMode
+                    ? "บันทึกการแก้ไขคิวเรียบร้อยแล้ว"
+                    : "บันทึกการจองคิวเรียบร้อยแล้ว",
+                color: "teal",
+                icon: <IconCheck size={20} />,
+            });
 
             onSuccess?.();
         } catch (err) {
-            console.error("[AddBookingDrawer] create error:", err);
-            alert("บันทึกการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            console.error("[AddBookingDrawer] save error:", err);
+
+            const backendMsg =
+                err?.response?.data?.detail ||
+                err?.response?.data?.message ||
+                err?.message ||
+                "บันทึกการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+
+            notifications.show({
+                title: "บันทึกไม่สำเร็จ",
+                message: String(backendMsg || "เกิดข้อผิดพลาดจากระบบ"),
+                color: "red",
+                icon: <IconX size={20} />,
+            });
         }
     };
 
@@ -273,7 +329,7 @@ export default function AddBookingDrawer({
             }}
             title={
                 <Text fw={600} size="md">
-                    Add Booking
+                    {isEditMode ? "Edit Booking" : "Add Booking"}
                 </Text>
             }
         >
@@ -318,7 +374,6 @@ export default function AddBookingDrawer({
 
                         {/* Queue / Supplier */}
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            {/* ❗ Queue: ห้ามแก้ไข อ่านอย่างเดียว */}
                             <NumberInput
                                 label="Queue *"
                                 value={form.queue_no}
@@ -344,13 +399,16 @@ export default function AddBookingDrawer({
                                 label="Truck Type *"
                                 placeholder="Select Truck Type"
                                 data={[
+                                    { value: "กระบะ", label: "กระบะ" },
                                     { value: "6 ล้อ", label: "6 ล้อ" },
                                     { value: "10 ล้อ", label: "10 ล้อ" },
                                     { value: "10 ล้อ พ่วง", label: "10 ล้อ (พ่วง)" },
                                     { value: "เทรลเลอร์", label: "เทรลเลอร์" },
                                 ]}
                                 value={form.truck_type}
-                                onChange={(val) => updateForm("truck_type", val || "")}
+                                onChange={(val) =>
+                                    updateForm("truck_type", val || "")
+                                }
                             />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -377,7 +435,6 @@ export default function AddBookingDrawer({
                             />
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, sm: 6 }}>
-                            {/* ❗ Recorder: ห้ามแก้ไข ใช้ค่าจาก defaults / auth */}
                             <TextInput
                                 label="Recorder"
                                 value={form.recorder}
@@ -396,7 +453,7 @@ export default function AddBookingDrawer({
                             Cancel
                         </Button>
                         <Button type="submit" color="indigo">
-                            Save Booking
+                            {isEditMode ? "Update Booking" : "Save Booking"}
                         </Button>
                     </Group>
                 </Stack>

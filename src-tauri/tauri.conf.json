@@ -23,7 +23,7 @@
         "fullscreen": false,
         "decorations": true,
         "transparent": false,
-        "devtools": true
+        "devtools": false
       }
     ],
     "security": {
@@ -61,7 +61,7 @@
       ],
       "windows": {
         "installMode": "passive",
-        "devtools": true
+        "devtools": false
       }
     }
   }

@@ -11,6 +11,7 @@ import {
     Container,
     Divider,
     Group,
+    Pagination,
     Select,
     Stack,
     Text,
@@ -38,6 +39,15 @@ const STATUS_FILTER_OPTIONS = [
     { value: "inactive", label: "Inactive" },
 ];
 
+const PAGE_SIZE_OPTIONS = [
+    { value: "10", label: "10 / หน้า" },
+    { value: "25", label: "25 / หน้า" },
+    { value: "50", label: "50 / หน้า" },
+    { value: "100", label: "100 / หน้า" },
+];
+
+const FETCH_LIMIT = 200; // โหลดมาสูงสุด 200 รายการ แล้วแบ่งหน้าฝั่ง FE
+
 export default function RubberTypesPage({ auth, onLogout }) {
     const { user } = auth || {};
     const navigate = useNavigate();
@@ -46,13 +56,16 @@ export default function RubberTypesPage({ auth, onLogout }) {
     const canManageRubberTypes =
         can(user, "portal.cuplump.rubbertypes.manage") || isSuperuser(user);
 
-    const [items, setItems] = useState([]);
+    // Data States
+    const [allItems, setAllItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
+
+    // Filters & Pagination States
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState(null);
     const [page, setPage] = useState(1);
-    const limit = 50;
+    const [pageSize, setPageSize] = useState(10);
 
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -64,23 +77,23 @@ export default function RubberTypesPage({ auth, onLogout }) {
         );
     }, [user]);
 
-    // โหลดรายการ Rubber Types
+    const effectiveNotificationsCount = 0;
+
+    // ===== โหลดรายการ Rubber Types (Load All) =====
     const fetchRubberTypes = async () => {
         if (!canViewRubberTypes) return;
         setLoading(true);
         try {
             const params = new URLSearchParams();
-            if (search) params.append("q", search);
-            if (statusFilter) params.append("status_filter", statusFilter);
-            params.append("limit", String(limit));
-            params.append("skip", String((page - 1) * limit));
+            params.append("limit", String(FETCH_LIMIT));
+            // params.append("skip", "0"); // ไม่ต้อง skip เพราะเราจะโหลดมา paginate เอง
 
             const data = await apiRequest(
                 `/rubber-types?${params.toString()}`,
                 {},
                 auth
             );
-            setItems(Array.isArray(data) ? data : []);
+            setAllItems(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("[RubberTypesPage] fetch error:", err);
             showNotification({
@@ -100,8 +113,61 @@ export default function RubberTypesPage({ auth, onLogout }) {
     useEffect(() => {
         fetchRubberTypes();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, statusFilter, page]);
+    }, []);
 
+    // ===== Filter Logic =====
+    const filteredItems = useMemo(() => {
+        const q = search.trim().toLowerCase();
+
+        return allItems.filter((item) => {
+            // 1. Status Filter
+            if (statusFilter && String(item.status) !== statusFilter) {
+                return false;
+            }
+
+            // 2. Search Text
+            if (!q) return true;
+            const nameText = (item.name || "").toLowerCase();
+            const codeText = (item.code || "").toLowerCase();
+            const descText = (item.description || "").toLowerCase();
+
+            return (
+                nameText.includes(q) ||
+                codeText.includes(q) ||
+                descText.includes(q)
+            );
+        });
+    }, [allItems, search, statusFilter]);
+
+    // Reset page เมื่อ filter เปลี่ยน
+    useEffect(() => {
+        setPage(1);
+    }, [search, statusFilter, pageSize]);
+
+    // ===== Pagination Logic =====
+    const total = filteredItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(page, totalPages);
+
+    const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const endIndex = total === 0 ? 0 : Math.min(currentPage * pageSize, total);
+
+    const pageItems = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+
+        // Sort: Active ขึ้นก่อน, ตามด้วย Code
+        const sorted = [...filteredItems].sort((a, b) => {
+            if (a.status !== b.status) {
+                return a.status === "active" ? -1 : 1;
+            }
+            return String(a.code).localeCompare(String(b.code));
+        });
+
+        return sorted.slice(start, end);
+    }, [filteredItems, currentPage, pageSize]);
+
+    // ===== Handlers =====
     const handleGoBackSystem = () => {
         if (window.history.length > 1) {
             window.history.back();
@@ -117,8 +183,8 @@ export default function RubberTypesPage({ auth, onLogout }) {
 
     const handleEdit = (item) => {
         if (!canManageRubberTypes) return;
-        if (!item?.id && !item?._id) return;
         const id = item.id || item._id;
+        if (!id) return;
         navigate(`/system/rubber-types/${id}/edit`);
     };
 
@@ -130,7 +196,9 @@ export default function RubberTypesPage({ auth, onLogout }) {
         try {
             setLoadingAction(true);
             await apiRequest(`/rubber-types/${id}`, { method: "DELETE" }, auth);
-            setItems((prev) => prev.filter((x) => (x.id || x._id) !== id));
+
+            // Update Local State
+            setAllItems((prev) => prev.filter((x) => (x.id || x._id) !== id));
 
             showNotification({
                 title: "ลบ Rubber Type สำเร็จ",
@@ -151,9 +219,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
         }
     };
 
-    const effectiveNotificationsCount = 0;
-
-    // ถ้าไม่มีสิทธิ์ view เลย
+    // ===== กรณีไม่มีสิทธิ์เข้าถึง =====
     if (!canViewRubberTypes) {
         return (
             <div
@@ -173,45 +239,25 @@ export default function RubberTypesPage({ auth, onLogout }) {
                     <AppShell.Main>
                         <Container size="lg" py="md">
                             <Stack gap="xl">
-                                {/* Header */}
                                 <Group justify="space-between" align="center">
                                     <Group gap="md">
                                         <ThemeIcon
                                             size={48}
                                             radius="md"
                                             variant="gradient"
-                                            gradient={{
-                                                from: "blue",
-                                                to: "indigo",
-                                                deg: 135,
-                                            }}
+                                            gradient={{ from: "blue", to: "indigo", deg: 135 }}
                                         >
                                             <IconActivity size={28} />
                                         </ThemeIcon>
                                         <div>
-                                            <Text
-                                                size="xl"
-                                                fw={800}
-                                                style={{
-                                                    letterSpacing: "-0.5px",
-                                                    lineHeight: 1.1,
-                                                    color: "#1e293b",
-                                                }}
-                                            >
+                                            <Text size="xl" fw={800} style={{ letterSpacing: "-0.5px", lineHeight: 1.1, color: "#1e293b" }}>
                                                 RUBBER TYPES
                                             </Text>
-                                            <Text
-                                                size="xs"
-                                                fw={500}
-                                                c="dimmed"
-                                                tt="uppercase"
-                                                style={{ letterSpacing: "1px" }}
-                                            >
+                                            <Text size="xs" fw={500} c="dimmed" tt="uppercase" style={{ letterSpacing: "1px" }}>
                                                 YTRC Master Data
                                             </Text>
                                         </div>
                                     </Group>
-
                                     <UserHeaderPanel
                                         user={user}
                                         displayName={displayName}
@@ -224,24 +270,14 @@ export default function RubberTypesPage({ auth, onLogout }) {
 
                                 <Card withBorder radius="md" shadow="xs">
                                     <Stack gap="sm" align="center">
-                                        <Title order={4}>
-                                            คุณไม่มีสิทธิ์เข้าถึงข้อมูล Rubber Types
-                                        </Title>
+                                        <Title order={4}>คุณไม่มีสิทธิ์เข้าถึงข้อมูล Rubber Types</Title>
                                         <Text size="sm" c="dimmed" ta="center">
                                             กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์{" "}
-                                            <Badge
-                                                size="xs"
-                                                variant="dot"
-                                                color="violet"
-                                            >
+                                            <Badge size="xs" variant="dot" color="violet">
                                                 portal.cuplump.rubbertypes.view
                                             </Badge>
                                         </Text>
-                                        <Button
-                                            leftSection={<IconArrowLeft size={14} />}
-                                            mt="sm"
-                                            onClick={handleGoBackSystem}
-                                        >
+                                        <Button leftSection={<IconArrowLeft size={14} />} mt="sm" onClick={handleGoBackSystem}>
                                             กลับไป System Center
                                         </Button>
                                     </Stack>
@@ -254,7 +290,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
         );
     }
 
-    // ปกติ (มีสิทธิ์)
+    // ===== กรณีปกติ =====
     return (
         <div
             style={{
@@ -273,40 +309,22 @@ export default function RubberTypesPage({ auth, onLogout }) {
                 <AppShell.Main>
                     <Container size="lg" py="md">
                         <Stack gap="xl">
-                            {/* HEADER แบบ StarterPage */}
+                            {/* HEADER */}
                             <Group justify="space-between" align="center">
                                 <Group gap="md">
                                     <ThemeIcon
                                         size={48}
                                         radius="md"
                                         variant="gradient"
-                                        gradient={{
-                                            from: "blue",
-                                            to: "indigo",
-                                            deg: 135,
-                                        }}
+                                        gradient={{ from: "blue", to: "indigo", deg: 135 }}
                                     >
                                         <IconCookie size={28} />
                                     </ThemeIcon>
                                     <div>
-                                        <Text
-                                            size="xl"
-                                            fw={800}
-                                            style={{
-                                                letterSpacing: "-0.5px",
-                                                lineHeight: 1.1,
-                                                color: "#1e293b",
-                                            }}
-                                        >
+                                        <Text size="xl" fw={800} style={{ letterSpacing: "-0.5px", lineHeight: 1.1, color: "#1e293b" }}>
                                             RUBBER TYPES
                                         </Text>
-                                        <Text
-                                            size="xs"
-                                            fw={500}
-                                            c="dimmed"
-                                            tt="uppercase"
-                                            style={{ letterSpacing: "1px" }}
-                                        >
+                                        <Text size="xs" fw={500} c="dimmed" tt="uppercase" style={{ letterSpacing: "1px" }}>
                                             Purchasing Data
                                         </Text>
                                     </div>
@@ -322,15 +340,15 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                 />
                             </Group>
 
-                            {/* MAIN CONTENT */}
-                            <Card withBorder radius="md" shadow="xs">
-                                <Stack gap="sm">
-                                    <Group
-                                        justify="space-between"
-                                        align="flex-end"
-                                    >
+                            {/* MAIN CARD */}
+                            <Card withBorder radius="md" shadow="xs" p="md" pt="sm">
+                                <Stack gap="xs">
+                                    {/* Title + Filters */}
+                                    <Group justify="space-between" align="flex-end" wrap="wrap">
                                         <Stack gap={2}>
-                                            <Title order={5}>Rubber Types</Title>
+                                            <Text size="sm" fw={600} c="gray.8" style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                                Rubber Types
+                                            </Text>
                                             <Text size="xs" c="dimmed">
                                                 จัดการประเภทของยาง เช่น STR20, USS, FSC ฯลฯ
                                             </Text>
@@ -341,12 +359,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                                 placeholder="ค้นหาด้วย code หรือ name"
                                                 size="xs"
                                                 value={search}
-                                                onChange={(e) => {
-                                                    setPage(1);
-                                                    setSearch(
-                                                        e.currentTarget.value
-                                                    );
-                                                }}
+                                                onChange={(e) => setSearch(e.currentTarget.value)}
                                                 style={{ minWidth: 220 }}
                                             />
                                             <Select
@@ -354,18 +367,14 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                                 size="xs"
                                                 data={STATUS_FILTER_OPTIONS}
                                                 value={statusFilter}
-                                                onChange={(v) => {
-                                                    setPage(1);
-                                                    setStatusFilter(v);
-                                                }}
+                                                onChange={(v) => setStatusFilter(v)}
                                                 clearable
+                                                style={{ width: 130 }}
                                             />
                                             {canManageRubberTypes && (
                                                 <Button
                                                     size="xs"
-                                                    leftSection={
-                                                        <IconPlus size={14} />
-                                                    }
+                                                    leftSection={<IconPlus size={14} />}
                                                     onClick={handleCreate}
                                                 >
                                                     New Rubber Type
@@ -376,6 +385,7 @@ export default function RubberTypesPage({ auth, onLogout }) {
 
                                     <Divider my="xs" />
 
+                                    {/* Table */}
                                     <Box
                                         style={{
                                             borderRadius: 8,
@@ -384,14 +394,45 @@ export default function RubberTypesPage({ auth, onLogout }) {
                                         }}
                                     >
                                         <RubberTypesTable
-                                            rubberTypes={items}  // 👈 แก้ตรงนี้
+                                            rubberTypes={pageItems} // ส่งเฉพาะหน้าที่ตัดแล้ว
                                             loading={loading}
-                                            canManageRubberTypes={
-                                                canManageRubberTypes
-                                            }
+                                            canManageRubberTypes={canManageRubberTypes}
                                             onEdit={handleEdit}
                                             onDelete={handleDelete}
                                         />
+                                    </Box>
+
+                                    {/* Footer: Pagination */}
+                                    <Box mt="xs" pt={8} style={{ borderTop: "1px solid rgba(226,232,240,1)" }}>
+                                        <Group justify="space-between" align="center" wrap="wrap">
+                                            {/* Summary */}
+                                            <Text size="xs" c="dimmed">
+                                                แสดง <strong>{startIndex} - {endIndex}</strong> จาก <strong>{total}</strong> รายการ
+                                            </Text>
+
+                                            {/* Controls */}
+                                            <Group gap="xs" align="center" wrap="wrap">
+                                                <Text size="xs" c="dimmed" mr={2}>แสดงต่อหน้า</Text>
+                                                <Select
+                                                    size="xs"
+                                                    data={PAGE_SIZE_OPTIONS}
+                                                    value={String(pageSize)}
+                                                    onChange={(v) => {
+                                                        const val = parseInt(v || "10", 10);
+                                                        setPageSize(Number.isNaN(val) ? 10 : val);
+                                                    }}
+                                                    style={{ width: 110 }}
+                                                />
+                                                <Pagination
+                                                    size="xs"
+                                                    radius="md"
+                                                    value={currentPage}
+                                                    onChange={setPage}
+                                                    total={totalPages}
+                                                    withEdges
+                                                />
+                                            </Group>
+                                        </Group>
                                     </Box>
 
                                     {loadingAction && (

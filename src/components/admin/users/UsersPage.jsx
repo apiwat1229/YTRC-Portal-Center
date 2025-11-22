@@ -9,6 +9,7 @@ import {
     Container,
     Divider,
     Group,
+    Pagination,
     Select,
     Stack,
     Text,
@@ -47,6 +48,15 @@ const STATUS_FILTER_OPTIONS = [
     { value: "suspended", label: "Suspended" },
 ];
 
+const PAGE_SIZE_OPTIONS = [
+    { value: "10", label: "10 / หน้า" },
+    { value: "25", label: "25 / หน้า" },
+    { value: "50", label: "50 / หน้า" },
+    { value: "100", label: "100 / หน้า" },
+];
+
+const FETCH_LIMIT = 200; // โหลดมาสูงสุด 200 รายการ แล้วแบ่งหน้าฝั่ง FE
+
 // helper ใช้ทุกที่ที่ต้องดึง userId
 const getUserId = (u) => u?.id || u?._id || u?.user_id || u?.userId || null;
 
@@ -58,14 +68,17 @@ export default function UsersPage({ auth, onLogout, onBack }) {
     const canManageUsers =
         can(user, "portal.admin.users.manage") || isSuperuser(user);
 
-    const [users, setUsers] = useState([]);
+    // Data States
+    const [allItems, setAllItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
+
+    // Filter & Pagination States
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState(null);
     const [statusFilter, setStatusFilter] = useState(null);
     const [page, setPage] = useState(1);
-    const limit = 50;
+    const [pageSize, setPageSize] = useState(10);
 
     const displayName = useMemo(() => {
         if (!user) return "";
@@ -77,24 +90,21 @@ export default function UsersPage({ auth, onLogout, onBack }) {
         );
     }, [user]);
 
-    // โหลด users จาก API
+    // โหลด users ทั้งหมดจาก API (ตาม FETCH_LIMIT)
     const fetchUsers = async () => {
         if (!canViewUsers) return;
         setLoading(true);
         try {
             const params = new URLSearchParams();
-            if (search) params.append("q", search);
-            if (roleFilter) params.append("role", roleFilter);
-            if (statusFilter) params.append("status_filter", statusFilter);
-            params.append("limit", String(limit));
-            params.append("page", String(page));
+            params.append("limit", String(FETCH_LIMIT));
+            // params.append("page", "1"); // โหลดหน้าแรกหน้าเดียวแต่เยอะๆ
 
             const data = await apiRequest(
                 `/users/?${params.toString()}`,
                 {},
                 auth
             );
-            setUsers(Array.isArray(data) ? data : []);
+            setAllItems(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("[UsersPage] fetchUsers error:", err);
             showNotification({
@@ -114,8 +124,75 @@ export default function UsersPage({ auth, onLogout, onBack }) {
     useEffect(() => {
         fetchUsers();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, roleFilter, statusFilter, page]);
+    }, []);
 
+    // ===== Filter Logic (Client-side) =====
+    const filteredItems = useMemo(() => {
+        const q = search.trim().toLowerCase();
+
+        return allItems.filter((item) => {
+            // 1. Role Filter
+            if (roleFilter && item.role !== roleFilter) {
+                return false;
+            }
+            // 2. Status Filter
+            if (statusFilter && item.status !== statusFilter) {
+                return false;
+            }
+            // 3. Search Text
+            if (!q) return true;
+
+            const nameText = (item.display_name || "").toLowerCase();
+            const emailText = (item.email || "").toLowerCase();
+            const usernameText = (item.username || "").toLowerCase();
+            const fname = (item.first_name || "").toLowerCase();
+            const lname = (item.last_name || "").toLowerCase();
+
+            return (
+                nameText.includes(q) ||
+                emailText.includes(q) ||
+                usernameText.includes(q) ||
+                fname.includes(q) ||
+                lname.includes(q)
+            );
+        });
+    }, [allItems, search, roleFilter, statusFilter]);
+
+    // Reset page เมื่อ filter เปลี่ยน
+    useEffect(() => {
+        setPage(1);
+    }, [search, roleFilter, statusFilter, pageSize]);
+
+    // ===== Pagination Logic =====
+    const total = filteredItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(page, totalPages);
+
+    const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const endIndex = total === 0 ? 0 : Math.min(currentPage * pageSize, total);
+
+    const pageItems = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+
+        // Sort: Active ขึ้นก่อน (Optional), หรือเรียงตามชื่อ
+        const sorted = [...filteredItems].sort((a, b) => {
+            // ตัวอย่าง: เอา Active ขึ้นก่อน
+            /* if (a.status !== b.status) {
+                return a.status === "active" ? -1 : 1;
+            }
+            */
+            // เรียงตามชื่อ
+            const nameA = a.display_name || a.username || "";
+            const nameB = b.display_name || b.username || "";
+            return nameA.localeCompare(nameB);
+        });
+
+        return sorted.slice(start, end);
+    }, [filteredItems, currentPage, pageSize]);
+
+
+    // ===== Actions =====
     const handleLogoutClick = () => {
         if (typeof onLogout !== "function") return;
 
@@ -139,13 +216,11 @@ export default function UsersPage({ auth, onLogout, onBack }) {
         });
     };
 
-    // ไปหน้า "สร้างผู้ใช้ใหม่"
     const handleCreateUser = () => {
         if (!canManageUsers) return;
         navigate("/system/users/new");
     };
 
-    // ไปหน้า "แก้ไขผู้ใช้"
     const handleEditUser = (u) => {
         if (!canManageUsers) return;
         const userId = getUserId(u);
@@ -174,8 +249,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
             confirmProps: { color: "red" },
             onConfirm: async () => {
                 if (!userId) {
-                    const msg =
-                        "ไม่พบ ID ของผู้ใช้งาน (u.id เป็น undefined)";
+                    const msg = "ไม่พบ ID ของผู้ใช้งาน (u.id เป็น undefined)";
                     console.error("[UsersPage] delete: missing userId", u);
                     showNotification({
                         title: "ลบผู้ใช้งานไม่สำเร็จ",
@@ -196,7 +270,8 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                         auth
                     );
 
-                    setUsers((prev) =>
+                    // Update Local State
+                    setAllItems((prev) =>
                         prev.filter((x) => getUserId(x) !== userId)
                     );
 
@@ -397,15 +472,20 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                 withBorder
                                 radius="md"
                                 style={{ backgroundColor: "white" }}
+                                p="md"
+                                pt="sm"
                             >
-                                <Stack gap="sm">
-                                    {/* Filter + Actions */}
+                                <Stack gap="xs">
+                                    {/* Title + Actions */}
                                     <Group
                                         justify="space-between"
                                         align="flex-end"
+                                        wrap="wrap"
                                     >
                                         <Stack gap={2}>
-                                            <Title order={5}>Users</Title>
+                                            <Text size="sm" fw={600} c="gray.8" style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                                Users
+                                            </Text>
                                             <Text size="xs" c="dimmed">
                                                 รายชื่อผู้ใช้งานทั้งหมดในระบบ
                                                 (เฉพาะ Super Admin / Admin)
@@ -416,14 +496,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                             <TextInput
                                                 placeholder="ค้นหาด้วยชื่อ, email หรือ username"
                                                 value={search}
-                                                onChange={(e) => {
-                                                    setPage(1);
-                                                    setSearch(
-                                                        e.currentTarget.value
-                                                    );
-                                                }}
+                                                onChange={(e) => setSearch(e.currentTarget.value)}
                                                 size="xs"
-                                                style={{ minWidth: 220 }}
+                                                style={{ minWidth: 240 }}
                                             />
 
                                             <Select
@@ -431,11 +506,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                                 size="xs"
                                                 data={ROLE_FILTER_OPTIONS}
                                                 value={roleFilter}
-                                                onChange={(v) => {
-                                                    setPage(1);
-                                                    setRoleFilter(v);
-                                                }}
+                                                onChange={(v) => setRoleFilter(v)}
                                                 clearable
+                                                style={{ width: 130 }}
                                             />
 
                                             <Select
@@ -443,11 +516,9 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                                 size="xs"
                                                 data={STATUS_FILTER_OPTIONS}
                                                 value={statusFilter}
-                                                onChange={(v) => {
-                                                    setPage(1);
-                                                    setStatusFilter(v);
-                                                }}
+                                                onChange={(v) => setStatusFilter(v)}
                                                 clearable
+                                                style={{ width: 110 }}
                                             />
 
                                             {canManageUsers && (
@@ -460,7 +531,7 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                                         handleCreateUser
                                                     }
                                                 >
-                                                    New user
+                                                    New User
                                                 </Button>
                                             )}
                                         </Group>
@@ -477,12 +548,45 @@ export default function UsersPage({ auth, onLogout, onBack }) {
                                         }}
                                     >
                                         <UsersTable
-                                            users={users}
+                                            users={pageItems}
                                             loading={loading}
                                             canManageUsers={canManageUsers}
                                             onEdit={handleEditUser}
                                             onDelete={handleDeleteUser}
                                         />
+                                    </Box>
+
+                                    {/* Footer: Pagination */}
+                                    <Box mt="xs" pt={8} style={{ borderTop: "1px solid rgba(226,232,240,1)" }}>
+                                        <Group justify="space-between" align="center" wrap="wrap">
+                                            {/* Summary */}
+                                            <Text size="xs" c="dimmed">
+                                                แสดง <strong>{startIndex} - {endIndex}</strong> จาก <strong>{total}</strong> รายการ
+                                            </Text>
+
+                                            {/* Controls */}
+                                            <Group gap="xs" align="center" wrap="wrap">
+                                                <Text size="xs" c="dimmed" mr={2}>แสดงต่อหน้า</Text>
+                                                <Select
+                                                    size="xs"
+                                                    data={PAGE_SIZE_OPTIONS}
+                                                    value={String(pageSize)}
+                                                    onChange={(v) => {
+                                                        const val = parseInt(v || "10", 10);
+                                                        setPageSize(Number.isNaN(val) ? 10 : val);
+                                                    }}
+                                                    style={{ width: 110 }}
+                                                />
+                                                <Pagination
+                                                    size="xs"
+                                                    radius="md"
+                                                    value={currentPage}
+                                                    onChange={setPage}
+                                                    total={totalPages}
+                                                    withEdges
+                                                />
+                                            </Group>
+                                        </Group>
                                     </Box>
 
                                     {loadingAction && (

@@ -1,4 +1,5 @@
 // src/components/booking/BookingQueuePage.jsx
+import { notifications } from "@mantine/notifications";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
@@ -29,11 +30,11 @@ import {
 } from "@tabler/icons-react";
 
 import { http } from "@/helpers/http";
+import { IconCheck, IconTrashX } from "@tabler/icons-react";
 import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
 import AddBookingDrawer from "./AddBookingDrawer";
 import BookingTicketModal from "./BookingTicketModal";
-
 // ===== config slot เวลาให้เหมือน BE =====
 const SLOT_OPTIONS = [
     { label: "08:00 - 09:00", value: "08:00-09:00" },
@@ -71,7 +72,9 @@ function getSlotConfig(slotValue) {
     return SLOT_QUEUE_CONFIG[slotValue] ?? { start: 1, limit: null };
 }
 
-// helper หาค่า id ของ booking จาก object ที่ BE ส่งมา (รองรับหลายชื่อ)
+// ===== helper =====
+
+// หาค่า id ของ booking จาก object ที่ BE ส่งมา (รองรับหลายชื่อ)
 function getQueueId(q) {
     return q?.id || q?._id || q?.booking_id || null;
 }
@@ -88,7 +91,6 @@ function parseQueueDate(dateField) {
     }
 
     if (typeof dateField === "string") {
-        // "2025-11-21" หรือ "2025-11-21T00:00:00Z"
         const iso = dateField.includes("T")
             ? dateField
             : `${dateField}T00:00:00`;
@@ -96,6 +98,36 @@ function parseQueueDate(dateField) {
     }
 
     return new Date();
+}
+
+// type ที่เรารองรับ (เอาไว้ใช้ split string ที่มาจาก field truck ตัวเดียว เช่น "6 ล้อ 123456")
+const KNOWN_TRUCK_TYPES = ["6 ล้อ", "10 ล้อ", "10 ล้อ พ่วง", "เทรลเลอร์"];
+
+// แยก truck_type + license_plate จาก queue object
+function extractTruckFields(q) {
+    let truck_type = q.truck_type || "";
+    let license_plate = q.truck_register || q.license_plate || "";
+
+    const rawTruck = (q.truck || "").toString().trim();
+
+    // ถ้ายังไม่มี truck_type แต่มีข้อความรวมอยู่ใน truck ให้ลอง split
+    if (!truck_type && rawTruck) {
+        const matchedType = KNOWN_TRUCK_TYPES.find((t) =>
+            rawTruck.startsWith(t),
+        );
+        if (matchedType) {
+            truck_type = matchedType;
+            const rest = rawTruck.slice(matchedType.length).trim();
+            if (!license_plate && rest) {
+                license_plate = rest;
+            }
+        } else if (!license_plate) {
+            // กรณีไม่รู้รูปแบบ type → เก็บทั้งก้อนเป็นป้ายทะเบียนแทน
+            license_plate = rawTruck;
+        }
+    }
+
+    return { truck_type, license_plate };
 }
 
 export default function BookingQueuePage({
@@ -251,6 +283,9 @@ export default function BookingQueuePage({
                 ? (queue.slot || selectedSlot).split("-")
                 : [queue.start_time, queue.end_time];
 
+        // 🔧 ใช้ helper แยก Truck Type + License Plate ออกจากค่าเก่า
+        const { truck_type, license_plate } = extractTruckFields(queue);
+
         setDrawerDefaults({
             mode: "edit",
             id: getQueueId(queue),
@@ -259,8 +294,8 @@ export default function BookingQueuePage({
             end_time: endTime || "",
             supplier_code: queue.supplier_code || queue.code || "",
             supplier_name: queue.supplier_name || queue.name || "",
-            truck_type: queue.truck_type || "",
-            truck_register: queue.truck_register || queue.truck || "",
+            truck_type,                             // <<-- type ที่แยกได้
+            truck_register: license_plate || "",    // <<-- ส่งไปเป็น truck_register
             rubber_type: queue.rubber_type || queue.type || "",
             booking_code: queue.booking_code || "",
             queue_no: queue.queue_no,
@@ -275,7 +310,14 @@ export default function BookingQueuePage({
         const id = getQueueId(queue);
         if (!id) {
             console.warn("[BookingQueuePage] delete: no id found", queue);
-            alert("ไม่พบ ID ของคิว ไม่สามารถลบได้");
+
+            notifications.show({
+                title: "ไม่พบข้อมูลคิว",
+                message: "ไม่พบ ID ของคิว ไม่สามารถลบได้",
+                color: "red",
+                icon: <IconTrashX size={18} />,
+            });
+
             return;
         }
 
@@ -283,9 +325,30 @@ export default function BookingQueuePage({
             setDeletingId(id);
             await http.delete(`/bookings/${id}`);
             await fetchQueues();
+
+            // ✅ แจ้งเตือนลบสำเร็จ
+            notifications.show({
+                title: "ลบคิวสำเร็จ",
+                message: `ลบคิวหมายเลข ${queue.queue_no ?? "-"} เรียบร้อยแล้ว`,
+                color: "teal",
+                icon: <IconCheck size={18} />,
+            });
         } catch (err) {
             console.error("[BookingQueuePage] delete error:", err);
-            alert("ลบคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+
+            const backendMsg =
+                err?.response?.data?.detail ||
+                err?.response?.data?.message ||
+                err?.message ||
+                "ลบคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+
+            // ❌ แจ้งเตือนลบไม่สำเร็จ
+            notifications.show({
+                title: "ลบคิวไม่สำเร็จ",
+                message: String(backendMsg),
+                color: "red",
+                icon: <IconTrashX size={18} />,
+            });
         } finally {
             setDeletingId(null);
         }
@@ -317,20 +380,20 @@ export default function BookingQueuePage({
         });
     };
 
-    // =========================================================
-    // 🚀 FIX: เตรียมข้อมูลก่อนส่งเข้า Ticket Modal
-    // =========================================================
+    // ===== Ticket Modal =====
     const handleTicket = (queue) => {
-        // ดึงค่า default เวลาจาก slot ที่เลือกอยู่ (กรณีใน queue ไม่มีมาให้)
-        const [defaultStart, defaultEnd] = (selectedSlot || "").split("-");
+        if (!queue) return;
 
-        // สร้าง object ใหม่ที่ Merge ข้อมูลจาก State หน้าเว็บเข้าไปด้วย
-        // เพื่อให้ Modal ได้รับ date และ time ครบถ้วน
+        const [defaultStart, defaultEnd] =
+            (queue.slot || selectedSlot || "").split("-").length === 2
+                ? (queue.slot || selectedSlot).split("-")
+                : [queue.start_time, queue.end_time];
+
+        const dateStr = dayjs(queue.date || selectedDate).format("YYYY-MM-DD");
+
         const queueWithContext = {
             ...queue,
-            // ถ้า queue.date เป็น null/undefined ให้ใช้ selectedDate ที่เลือกอยู่
-            date: queue.date || selectedDate,
-            // ถ้าไม่มี start_time/end_time ให้ใช้จาก slot ที่เลือกอยู่
+            date: dateStr,
             start_time: queue.start_time || defaultStart,
             end_time: queue.end_time || defaultEnd,
         };
@@ -350,10 +413,7 @@ export default function BookingQueuePage({
                 fontFamily: "'Outfit', system-ui, sans-serif",
             }}
         >
-            <AppShell
-                padding="md"
-                styles={{ main: { backgroundColor: "transparent" } }}
-            >
+            <AppShell padding="md" styles={{ main: { backgroundColor: "transparent" } }}>
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
@@ -364,11 +424,7 @@ export default function BookingQueuePage({
                                         size={48}
                                         radius="md"
                                         variant="gradient"
-                                        gradient={{
-                                            from: "indigo",
-                                            to: "cyan",
-                                            deg: 135,
-                                        }}
+                                        gradient={{ from: "indigo", to: "cyan", deg: 135 }}
                                     >
                                         <IconActivity size={28} />
                                     </ThemeIcon>
@@ -558,6 +614,8 @@ export default function BookingQueuePage({
                                     {queues.map((q) => {
                                         const id = getQueueId(q);
                                         const isDeleting = deletingId === id;
+                                        const { truck_type, license_plate } =
+                                            extractTruckFields(q);
 
                                         return (
                                             <Card
@@ -623,11 +681,9 @@ export default function BookingQueuePage({
                                                         </Text>
                                                         <Text size="xs">
                                                             <b>Truck :</b>{" "}
-                                                            {q.truck ||
-                                                                [q.truck_type, q.truck_register]
-                                                                    .filter(Boolean)
-                                                                    .join(" ")
-                                                                    .trim()}
+                                                            {[truck_type, license_plate]
+                                                                .filter(Boolean)
+                                                                .join(" ") || "-"}
                                                         </Text>
                                                         <Text size="xs">
                                                             <b>Type :</b>{" "}

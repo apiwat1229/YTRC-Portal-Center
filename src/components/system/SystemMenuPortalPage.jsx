@@ -17,9 +17,9 @@ import {
 } from "@mantine/core";
 
 import {
-    IconSettingsCog,
     IconBox,
     IconKey,
+    IconSettingsCog,
     IconShieldLock,
     IconTruck,
     IconUsers,
