@@ -2,7 +2,6 @@
 import {
     Button,
     Group,
-    Paper,
     Select,
     Stack,
     Table,
@@ -42,124 +41,117 @@ export default function DrainMonitorTab({ user }) {
     };
 
     return (
-        <Paper
-            radius="lg"
-            withBorder
-            shadow="md"
-            p="lg"
-            style={{
-                backgroundColor: "#ffffff",
-                boxShadow: "0 18px 40px rgba(15,23,42,0.06)",
-            }}
-        >
-            <Stack gap="lg">
-                {/* Header row */}
-                <Group justify="space-between" align="center">
-                    <Text fw={700} size="sm">
-                        CHECK-OUT — DRAIN MONITOR
+        <Stack gap="lg">
+            {/* Header row */}
+            <Group justify="space-between" align="center">
+                <Text fw={700} size="sm">
+                    CHECK-OUT — DRAIN MONITOR
+                </Text>
+                <Text size="xs" c="dimmed">
+                    Operations / Check-OUT — Drain Monitor
+                </Text>
+            </Group>
+
+            {/* Filters */}
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                <Group gap="xs">
+                    <Text size="sm" fw={600}>
+                        แสดง
                     </Text>
-                    <Text size="xs" c="dimmed">
-                        Operations / Check-OUT — Drain Monitor
+                    <Select
+                        data={["10", "25", "50"]}
+                        value={rowsPerPage}
+                        onChange={setRowsPerPage}
+                        size="xs"
+                        w={80}
+                    />
+                    <Text size="sm" fw={600}>
+                        แถว
                     </Text>
                 </Group>
 
-                {/* Filters */}
-                <Group justify="space-between" align="center" wrap="wrap" gap="sm">
-                    <Group gap="xs">
-                        <Text size="sm" fw={600}>
-                            แสดง
-                        </Text>
-                        <Select
-                            data={["10", "25", "50"]}
-                            value={rowsPerPage}
-                            onChange={setRowsPerPage}
-                            size="xs"
-                            w={80}
-                        />
-                        <Text size="sm" fw={600}>
-                            แถว
-                        </Text>
-                    </Group>
-
-                    <Group gap="xs">
-                        <DateInput
-                            value={selectedDate}
-                            onChange={setSelectedDate}
-                            valueFormat="DD/MM/YYYY"
-                            size="sm"
-                            w={160}
-                        />
-                        <TextInput
-                            placeholder="ค้นหา..."
-                            leftSection={<IconSearch size={14} />}
-                            size="sm"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.currentTarget.value)}
-                            w={220}
-                        />
-                    </Group>
+                <Group gap="xs">
+                    <DateInput
+                        value={selectedDate}
+                        onChange={setSelectedDate}
+                        valueFormat="DD/MM/YYYY"
+                        size="sm"
+                        w={160}
+                    />
+                    <TextInput
+                        placeholder="ค้นหา..."
+                        leftSection={<IconSearch size={14} />}
+                        size="sm"
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.currentTarget.value)}
+                        w={220}
+                    />
                 </Group>
+            </Group>
 
-                {/* Table */}
-                <Table striped highlightOnHover>
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th>Supplier</Table.Th>
-                            <Table.Th>Queue</Table.Th>
-                            <Table.Th>ทะเบียนรถ</Table.Th>
-                            <Table.Th>ประเภท</Table.Th>
-                            <Table.Th>Start Drain</Table.Th>
-                            <Table.Th>Stop Drain</Table.Th>
-                            <Table.Th>Total Drain</Table.Th>
-                            <Table.Th>Weight In</Table.Th>
-                            <Table.Th>Weight Out</Table.Th>
+            {/* Table */}
+            <Table striped highlightOnHover>
+                <Table.Thead>
+                    <Table.Tr>
+                        <Table.Th>Supplier</Table.Th>
+                        <Table.Th>Queue</Table.Th>
+                        <Table.Th>ทะเบียนรถ</Table.Th>
+                        <Table.Th>ประเภท</Table.Th>
+                        <Table.Th>Start Drain</Table.Th>
+                        <Table.Th>Stop Drain</Table.Th>
+                        <Table.Th>Total Drain</Table.Th>
+                        <Table.Th>Weight In</Table.Th>
+                        <Table.Th>Weight Out</Table.Th>
+                    </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                    {items.map((item) => (
+                        <Table.Tr key={item.id}>
+                            <Table.Td>{item.supplier}</Table.Td>
+                            <Table.Td>{item.queue}</Table.Td>
+                            <Table.Td>{item.plate}</Table.Td>
+                            <Table.Td>{item.truckType}</Table.Td>
+                            <Table.Td style={{ color: "#16a34a" }}>
+                                {item.startDrain}
+                            </Table.Td>
+                            <Table.Td style={{ color: "#ef4444" }}>
+                                {item.stopDrain}
+                            </Table.Td>
+                            <Table.Td>{item.totalDrain}</Table.Td>
+                            <Table.Td>
+                                <Text size="xs">{item.weightIn.raw}</Text>
+                                <Text size="xs">{item.weightIn.cup}</Text>
+                                <Text size="xs" fw={700}>
+                                    {item.weightIn.total}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Button
+                                    size="xs"
+                                    variant="light"
+                                    color="indigo"
+                                    onClick={() => handleWeightOutClick(item)}
+                                >
+                                    บันทึก
+                                </Button>
+                            </Table.Td>
                         </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {items.map((item) => (
-                            <Table.Tr key={item.id}>
-                                <Table.Td>{item.supplier}</Table.Td>
-                                <Table.Td>{item.queue}</Table.Td>
-                                <Table.Td>{item.plate}</Table.Td>
-                                <Table.Td>{item.truckType}</Table.Td>
-                                <Table.Td>{item.startDrain}</Table.Td>
-                                <Table.Td>{item.stopDrain}</Table.Td>
-                                <Table.Td>{item.totalDrain}</Table.Td>
-                                <Table.Td>
-                                    <Text size="xs">{item.weightIn.raw}</Text>
-                                    <Text size="xs">{item.weightIn.cup}</Text>
-                                    <Text size="xs" fw={700}>
-                                        {item.weightIn.total}
-                                    </Text>
-                                </Table.Td>
-                                <Table.Td>
-                                    <Button
-                                        size="xs"
-                                        variant="light"
-                                        color="indigo"
-                                        onClick={() => handleWeightOutClick(item)}
-                                    >
-                                        บันทึก
-                                    </Button>
-                                </Table.Td>
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
+                    ))}
+                </Table.Tbody>
+            </Table>
 
-                {/* Pagination mock */}
-                <Group justify="flex-end" mt="sm">
-                    <Button variant="default" size="xs">
-                        ก่อนหน้า
-                    </Button>
-                    <Button variant="light" size="xs">
-                        1
-                    </Button>
-                    <Button color="indigo" size="xs">
-                        ถัดไป
-                    </Button>
-                </Group>
-            </Stack>
-        </Paper>
+            {/* Pagination mock */}
+            <Group justify="flex-end" mt="sm">
+                <Button variant="default" size="xs">
+                    ก่อนหน้า
+                </Button>
+                <Button variant="light" size="xs">
+                    1
+                </Button>
+                <Button color="indigo" size="xs">
+                    ถัดไป
+                </Button>
+            </Group>
+        </Stack>
     );
 }

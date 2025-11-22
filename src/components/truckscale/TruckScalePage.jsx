@@ -1,6 +1,14 @@
 // src/components/truckscale/TruckScalePage.jsx
-import { AppShell, Container, Group, Stack, Tabs, Text, ThemeIcon } from "@mantine/core";
-import { IconActivity, IconScale } from "@tabler/icons-react";
+import {
+    AppShell,
+    Container,
+    Group,
+    Stack,
+    Tabs,
+    Text,
+    ThemeIcon,
+} from "@mantine/core";
+import { IconScale } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
 import UserHeaderPanel from "../common/UserHeaderPanel";
@@ -37,7 +45,7 @@ export default function TruckScalePage({
                 minHeight: "100vh",
                 backgroundColor: "#f3f4f6",
                 backgroundImage:
-                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%)",
+                    "radial-gradient(at 0% 0%, rgba(59,130,246,0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139,92,246,0.1) 0px, transparent 50%)",
                 fontFamily: "'Outfit', system-ui, sans-serif",
             }}
         >
@@ -45,7 +53,8 @@ export default function TruckScalePage({
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
-                            {/* HEADER */}
+
+                            {/* ===== HEADER ===== */}
                             <Group justify="space-between" align="center">
                                 <Group gap="md">
                                     <ThemeIcon
@@ -68,13 +77,8 @@ export default function TruckScalePage({
                                         >
                                             TRUCK SCALE
                                         </Text>
-                                        <Text
-                                            size="xs"
-                                            fw={500}
-                                            c="dimmed"
-                                            tt="uppercase"
-                                            style={{ letterSpacing: "1px" }}
-                                        >
+                                        <Text size="xs" fw={500} c="dimmed" tt="uppercase"
+                                            style={{ letterSpacing: "1px" }}>
                                             Operations – Weighing & Drain Monitor
                                         </Text>
                                     </div>
@@ -90,43 +94,87 @@ export default function TruckScalePage({
                                 />
                             </Group>
 
-                            {/* TABS */}
+                            {/* ===== TABS ===== */}
                             <Tabs
                                 value={activeTab}
                                 onChange={setActiveTab}
-                                variant="outline"
+                                keepMounted={false}
                                 radius="md"
-                                defaultValue="checkin"
+                                styles={{
+                                    list: {
+                                        borderBottom: "1px solid #e5e7eb",
+                                    },
+                                    tab: {
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        paddingTop: 10,
+                                        paddingBottom: 10,
+                                        borderRadius: 0,
+                                    }
+                                }}
                             >
-                                <Tabs.List>
-                                    <Tabs.Tab value="checkin" leftSection={<IconActivity size={14} />}>
-                                        Booking – Check-in
+                                {/* Grow = กระจายเต็มบรรทัดแบบเรียบ */}
+                                <Tabs.List grow>
+                                    <Tabs.Tab value="checkin">
+                                        Booking Check-in
                                     </Tabs.Tab>
-                                    <Tabs.Tab value="weight_in">Weight Scale IN</Tabs.Tab>
-                                    <Tabs.Tab value="drain_monitor">Check-OUT – Drain Monitor</Tabs.Tab>
-                                    <Tabs.Tab value="summary">Weight Summary – Dashboard</Tabs.Tab>
+                                    <Tabs.Tab value="weight_in">
+                                        Weight Scale In
+                                    </Tabs.Tab>
+                                    <Tabs.Tab value="drain_monitor">
+                                        Weight Scale Out
+                                    </Tabs.Tab>
+                                    <Tabs.Tab value="summary">
+                                        Weight Summary Dashboard
+                                    </Tabs.Tab>
                                 </Tabs.List>
 
+                                {/* PANEL – กล่องขาว radius 12 */}
                                 <Tabs.Panel value="checkin" pt="md">
-                                    <BookingCheckInTab user={user} />
+                                    <PanelWrapper>
+                                        <BookingCheckInTab user={user} />
+                                    </PanelWrapper>
                                 </Tabs.Panel>
 
                                 <Tabs.Panel value="weight_in" pt="md">
-                                    <WeightScaleInTab user={user} />
+                                    <PanelWrapper>
+                                        <WeightScaleInTab user={user} />
+                                    </PanelWrapper>
                                 </Tabs.Panel>
 
                                 <Tabs.Panel value="drain_monitor" pt="md">
-                                    <DrainMonitorTab user={user} />
+                                    <PanelWrapper>
+                                        <DrainMonitorTab user={user} />
+                                    </PanelWrapper>
                                 </Tabs.Panel>
 
                                 <Tabs.Panel value="summary" pt="md">
-                                    <WeightSummaryTab />
+                                    <PanelWrapper>
+                                        <WeightSummaryTab />
+                                    </PanelWrapper>
                                 </Tabs.Panel>
                             </Tabs>
+
                         </Stack>
                     </Container>
                 </AppShell.Main>
             </AppShell>
+        </div>
+    );
+}
+
+/* ===== แยก Wrapper ให้สวยและสะอาดขึ้น ===== */
+function PanelWrapper({ children }) {
+    return (
+        <div
+            style={{
+                backgroundColor: "#ffffff",
+                borderRadius: 12,
+                padding: 20,
+                boxShadow: "0 18px 40px -24px rgba(15,23,42,0.25)",
+            }}
+        >
+            {children}
         </div>
     );
 }
