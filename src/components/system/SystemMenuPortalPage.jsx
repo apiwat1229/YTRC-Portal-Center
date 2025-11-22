@@ -26,7 +26,6 @@ import {
 } from "@tabler/icons-react";
 
 import { can } from "../auth/permission";
-// 🔹 ปรับ path ให้ตรงกับไฟล์ UserHeaderPanel จริง
 import UserHeaderPanel from "../common/UserHeaderPanel";
 
 const APP_NAME = "YTRC Portal Center";
@@ -83,9 +82,8 @@ export default function SystemMenuPortalPage({
                 <AppShell.Main>
                     <Container size="lg" py="md">
                         <Stack gap="xl">
-                            {/* ========= HEADER (แบบ StarterPage) ========= */}
+                            {/* ========= HEADER ========= */}
                             <Group justify="space-between" align="center">
-                                {/* Hero Title */}
                                 <Group gap="md">
                                     <ThemeIcon
                                         size={48}
@@ -123,31 +121,26 @@ export default function SystemMenuPortalPage({
                                     </div>
                                 </Group>
 
-                                {/* Header ขวา */}
                                 <UserHeaderPanel
                                     user={user}
                                     displayName={displayName}
                                     onBackClick={onBack}
                                     onNotificationsClick={onNotificationsClick}
                                     onLogout={onLogout}
-                                    notificationsCount={
-                                        effectiveNotificationsCount
-                                    }
+                                    notificationsCount={effectiveNotificationsCount}
                                 />
                             </Group>
 
                             {/* ========= MAIN SYSTEM MENU CONTENT ========= */}
-                            <Stack gap="md">
+                            <Stack gap="lg">
                                 {/* Section 1: Security & Access Control */}
                                 <Divider label="Security & Access Control" />
 
-                                <SimpleGrid
-                                    cols={{ base: 1, sm: 2 }}
-                                    spacing="lg"
-                                >
-                                    <SettingCard
+                                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                                    <AppWidget
                                         title="User Management"
-                                        description="จัดการบัญชีผู้ใช้งาน: สร้าง, แก้ไข, ระงับการใช้งาน และรีเซ็ตรหัสผ่าน"
+                                        subtitle="จัดการบัญชีผู้ใช้งาน"
+                                        description="สร้าง / แก้ไข / ระงับการใช้งาน และรีเซ็ตรหัสผ่าน"
                                         icon={IconUsers}
                                         color="blue"
                                         active={activeTool === "users"}
@@ -159,9 +152,10 @@ export default function SystemMenuPortalPage({
                                         }}
                                     />
 
-                                    <SettingCard
+                                    <AppWidget
                                         title="Permission Manager"
-                                        description="กำหนดสิทธิ์การเข้าถึง (Roles & Policies) และผูกสิทธิ์กับผู้ใช้งาน"
+                                        subtitle="สิทธิ์การเข้าถึง"
+                                        description="กำหนด Roles & Policies และผูกสิทธิ์กับผู้ใช้งาน"
                                         icon={IconKey}
                                         color="grape"
                                         active={activeTool === "permissions"}
@@ -177,13 +171,11 @@ export default function SystemMenuPortalPage({
                                 {/* Section 2: Purchasing Database */}
                                 <Divider label="Purchasing Database" />
 
-                                <SimpleGrid
-                                    cols={{ base: 1, sm: 2 }}
-                                    spacing="lg"
-                                >
-                                    <SettingCard
+                                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                                    <AppWidget
                                         title="Suppliers"
-                                        description="ฐานข้อมูลคู่ค้า/ผู้ส่งมอบ สำหรับระบบรับซื้อยางและระบบคิว"
+                                        subtitle="ฐานข้อมูลคู่ค้า"
+                                        description="ข้อมูลคู่ค้า/ผู้ส่งมอบสำหรับระบบรับซื้อยางและระบบคิว"
                                         icon={IconTruck}
                                         color="teal"
                                         active={activeTool === "suppliers"}
@@ -195,10 +187,10 @@ export default function SystemMenuPortalPage({
                                         }}
                                     />
 
-                                    {/* 🔹 Rubber Types → ไปหน้าใหม่ /system/rubber-types */}
-                                    <SettingCard
+                                    <AppWidget
                                         title="Rubber Types"
-                                        description="จัดการข้อมูลชนิดยาง (STR20, USS) และเกรดสินค้า"
+                                        subtitle="ชนิดยาง & เกรด"
+                                        description="จัดการชนิดยาง (STR20, USS) และเกรดสินค้า"
                                         icon={IconBox}
                                         color="green"
                                         active={activeTool === "rubbertypes"}
@@ -237,14 +229,11 @@ export default function SystemMenuPortalPage({
                                             justifyContent: "center",
                                         }}
                                     >
-                                        <IconShieldLock
-                                            size={18}
-                                            color="#64748b"
-                                        />
+                                        <IconShieldLock size={18} color="#64748b" />
                                     </Box>
                                     <Text size="sm" c="dimmed">
-                                        การเปลี่ยนแปลงการตั้งค่าระบบจะถูกบันทึกใน
-                                        Audit Log เพื่อความปลอดภัยและสามารถตรวจสอบย้อนหลังได้
+                                        การเปลี่ยนแปลงการตั้งค่าระบบจะถูกบันทึกใน Audit Log
+                                        เพื่อความปลอดภัยและสามารถตรวจสอบย้อนหลังได้
                                     </Text>
                                 </Paper>
                             </Stack>
@@ -256,12 +245,13 @@ export default function SystemMenuPortalPage({
     );
 }
 
-/* ===== SettingCard ===== */
-function SettingCard({
+/* ===== AppWidget (Tile-style widget) ===== */
+function AppWidget({
     title,
+    subtitle,
     description,
     icon: Icon,
-    color,
+    color = "blue",
     active,
     disabled,
     onClick,
@@ -270,28 +260,28 @@ function SettingCard({
 
     const colors = {
         blue: {
-            bg: "#eff6ff",
+            bg: "rgba(59,130,246,0.08)",
             text: "#2563eb",
             border: "#bfdbfe",
-            shadow: "rgba(37,99,235,.1)",
+            shadow: "rgba(37,99,235,.18)",
         },
         grape: {
-            bg: "#f3e8ff",
+            bg: "rgba(147,51,234,0.08)",
             text: "#9333ea",
             border: "#d8b4fe",
-            shadow: "rgba(147,51,234,.1)",
+            shadow: "rgba(147,51,234,.18)",
         },
         teal: {
-            bg: "#f0fdfa",
+            bg: "rgba(13,148,136,0.08)",
             text: "#0d9488",
             border: "#99f6e4",
-            shadow: "rgba(13,148,136,.1)",
+            shadow: "rgba(13,148,136,.18)",
         },
         green: {
-            bg: "#f0fdf4",
+            bg: "rgba(22,163,74,0.08)",
             text: "#16a34a",
             border: "#bbf7d0",
-            shadow: "rgba(22,163,74,.1)",
+            shadow: "rgba(22,163,74,.18)",
         },
         gray: {
             bg: "#f8fafc",
@@ -306,74 +296,107 @@ function SettingCard({
 
     return (
         <Paper
-            radius={16}
+            radius={18}
             withBorder
-            p={24}
-            onClick={() => !disabled && onClick()}
+            p={18}
+            onClick={() => !disabled && onClick?.()}
             onMouseEnter={() => !disabled && setHover(true)}
             onMouseLeave={() => setHover(false)}
             style={{
                 cursor: disabled ? "not-allowed" : "pointer",
                 borderColor: isActiveOrHover ? theme.border : "#e2e8f0",
                 boxShadow: isActiveOrHover
-                    ? `0 10px 20px -5px ${theme.shadow}`
-                    : "0 1px 3px rgba(0,0,0,0.05)",
+                    ? `0 12px 24px -6px ${theme.shadow}`
+                    : "0 1px 3px rgba(15,23,42,0.06)",
                 transform:
-                    hover && !disabled ? "translateY(-2px)" : "translateY(0)",
+                    hover && !disabled ? "translateY(-3px)" : "translateY(0)",
                 position: "relative",
                 opacity: disabled ? 0.7 : 1,
-                transition: "all 0.2s ease",
-                backgroundColor: "white",
+                transition: "all 0.18s ease-out",
+                background:
+                    "radial-gradient(circle at 0 0, rgba(148,163,184,0.18), transparent 55%), #ffffff",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
             }}
         >
-            <Group align="flex-start" gap="md">
+            <Group justify="space-between" align="flex-start">
+                {/* Icon bubble */}
                 <Box
                     style={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 14,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 20,
                         backgroundColor: theme.bg,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: theme.text,
                         flexShrink: 0,
-                        transition: "transform 0.3s ease",
                         transform:
                             hover && !disabled ? "scale(1.05)" : "scale(1)",
+                        transition: "transform 0.2s ease-out",
                     }}
                 >
-                    <Icon size={28} />
+                    <Icon size={30} />
                 </Box>
 
-                <Box style={{ flex: 1 }}>
-                    <Group justify="space-between" align="center" mb={4}>
-                        <Text fw={600} style={{ letterSpacing: "-0.01em" }}>
-                            {title}
-                        </Text>
-                        <Badge
-                            variant={disabled ? "outline" : "light"}
-                            color={disabled ? "gray" : color}
-                        >
-                            {disabled ? "Locked" : "Active"}
-                        </Badge>
-                    </Group>
-
-                    <Text size="sm" c="dimmed" style={{ lineHeight: 1.5 }}>
-                        {description}
-                    </Text>
-                </Box>
+                {/* Status badge */}
+                <Badge
+                    size="xs"
+                    variant={disabled ? "outline" : "light"}
+                    color={disabled ? "gray" : color}
+                    radius="xl"
+                >
+                    {disabled ? "Locked" : "Active"}
+                </Badge>
             </Group>
 
+            {/* Text content */}
+            <Box style={{ flex: 1 }}>
+                {subtitle && (
+                    <Text
+                        size="xs"
+                        c="dimmed"
+                        tt="uppercase"
+                        fw={600}
+                        style={{
+                            letterSpacing: "0.12em",
+                            fontSize: 10,
+                            marginBottom: 4,
+                        }}
+                    >
+                        {subtitle}
+                    </Text>
+                )}
+
+                <Text
+                    fw={700}
+                    style={{
+                        letterSpacing: "-0.01em",
+                        marginBottom: 4,
+                        color: "#0f172a",
+                    }}
+                >
+                    {title}
+                </Text>
+
+                <Text size="sm" c="dimmed" style={{ lineHeight: 1.5 }}>
+                    {description}
+                </Text>
+            </Box>
+
+            {/* Active indicator bar */}
             {active && (
                 <Box
                     style={{
                         position: "absolute",
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 4,
-                        backgroundColor: theme.text,
+                        left: 16,
+                        bottom: 12,
+                        width: 40,
+                        height: 3,
+                        borderRadius: 999,
+                        background: theme.text,
                     }}
                 />
             )}

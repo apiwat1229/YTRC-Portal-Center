@@ -12,6 +12,9 @@ import RubberTypesPage from "../components/admin/rubbertypes/RubberTypesPage";
 import SupplierEditorPage from "../components/admin/suppliers/SupplierEditorPage";
 import SuppliersPage from "../components/admin/suppliers/SuppliersPage";
 
+// ✅ Truck Scale main page (มี Tabs ด้านใน)
+import TruckScalePage from "@/components/truckscale/TruckScalePage";
+
 // ✅ ใช้ตัวเดียวกับ PortalCenterPage
 import { can } from "../components/auth/permission";
 
@@ -183,6 +186,31 @@ export function renderSystemRoutes({ auth, onLogout }) {
                         <BookingQueuePage auth={auth} onLogout={onLogout} />
                     ) : (
                         // ถ้าไม่มีสิทธิ์ → ส่งกลับหน้าแรก
+                        <Navigate to="/" replace />
+                    ),
+                )}
+            />
+
+            {/* ===== Truck Scale (หน้าใหม่ /truckscale มี Tabs ด้านใน) ===== */}
+            <Route
+                path="/truckscale"
+                element={requireAuthElement(
+                    auth,
+                    can(user, "portal.app.truckscale.view") ? (
+                        <TruckScalePage
+                            auth={auth}
+                            onLogout={onLogout}
+                            onBack={() => {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    window.location.href = "/";
+                                }
+                            }}
+                            onNotificationsClick={() => { }}
+                            notificationsCount={0}
+                        />
+                    ) : (
                         <Navigate to="/" replace />
                     ),
                 )}

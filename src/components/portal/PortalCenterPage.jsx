@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import {
     AppShell,
+    Badge,
+    Card,
     Container,
     Group,
     SimpleGrid,
@@ -27,13 +29,13 @@ import {
 import { can } from "../auth/permission";
 import StatusFooterBar from "../common/StatusFooterBar";
 import UserHeaderPanel from "../common/UserHeaderPanel";
-import AppWidget from "./AppWidget";
 
-// ---------------- Helper: Permission ----------------
+/* ---------------- Helper: Permission ---------------- */
 function canView(user, permission) {
     return can(user, permission);
 }
 
+/* ======================= MAIN PAGE ======================= */
 export default function PortalCenterPage({
     auth,
     onLogout,
@@ -80,7 +82,7 @@ export default function PortalCenterPage({
             status: "Online",
             description: "Manage queues, tickets & truck check-ins.",
             canAccess: canQR,
-            path: "/qr",            // เปลี่ยนเป็น route จริงของโปรเจกต์
+            path: "/qr",
         },
         {
             id: "cuplump",
@@ -173,7 +175,8 @@ export default function PortalCenterPage({
                 centered: true,
                 children: (
                     <Text size="sm">
-                        คุณไม่มีสิทธิ์เข้าถึงโมดูล <b>{app.title}</b> กรุณาติดต่อผู้ดูแลระบบ
+                        คุณไม่มีสิทธิ์เข้าถึงโมดูล <b>{app.title}</b>{" "}
+                        กรุณาติดต่อผู้ดูแลระบบ
                     </Text>
                 ),
             });
@@ -203,7 +206,10 @@ export default function PortalCenterPage({
                 fontFamily: "'Outfit', system-ui, sans-serif",
             }}
         >
-            <AppShell padding="md" styles={{ main: { backgroundColor: "transparent" } }}>
+            <AppShell
+                padding="md"
+                styles={{ main: { backgroundColor: "transparent" } }}
+            >
                 <AppShell.Main>
                     <Container size="xl" py="md">
                         <Stack gap="xl">
@@ -214,7 +220,11 @@ export default function PortalCenterPage({
                                         size={48}
                                         radius="md"
                                         variant="gradient"
-                                        gradient={{ from: "blue", to: "indigo", deg: 135 }}
+                                        gradient={{
+                                            from: "blue",
+                                            to: "indigo",
+                                            deg: 135,
+                                        }}
                                     >
                                         <IconActivity size={28} />
                                     </ThemeIcon>
@@ -223,7 +233,10 @@ export default function PortalCenterPage({
                                         <Text
                                             size="xl"
                                             fw={800}
-                                            style={{ letterSpacing: "-0.5px", lineHeight: 1.1 }}
+                                            style={{
+                                                letterSpacing: "-0.5px",
+                                                lineHeight: 1.1,
+                                            }}
                                         >
                                             PORTAL CENTER
                                         </Text>
@@ -239,7 +252,6 @@ export default function PortalCenterPage({
                                     </div>
                                 </Group>
 
-                                {/* Header ขวา: เวลา + ชื่อ + ปุ่ม Back / Noti / Logout */}
                                 <UserHeaderPanel
                                     user={user}
                                     displayName={displayName}
@@ -251,7 +263,10 @@ export default function PortalCenterPage({
                             </Group>
 
                             {/* ================= APP GRID ================= */}
-                            <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
+                            <SimpleGrid
+                                cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
+                                spacing="lg"
+                            >
                                 {apps.map((app) => (
                                     <AppWidget
                                         key={app.id}
@@ -280,5 +295,144 @@ export default function PortalCenterPage({
                 </AppShell.Main>
             </AppShell>
         </div>
+    );
+}
+
+/* ======================= APP WIDGET ======================= */
+/**
+ * กล่องแอปแต่ละตัวใน grid (QR System, Cuplump, Booking ฯลฯ)
+ * - ไม่รู้เรื่อง route / permission
+ * - แค่เรียก onClick ถ้าไม่ได้ disabled
+ */
+function AppWidget({
+    title,
+    category,
+    icon: Icon,
+    color,
+    status,
+    description,
+    active,
+    disabled,
+    onClick,
+    alert,
+}) {
+    const [hovered, setHovered] = useState(false);
+
+    const themeColor = `var(--mantine-color-${color}-6)`;
+
+    return (
+        <Card
+            padding="lg"
+            radius="lg"
+            withBorder
+            bg="white"
+            onClick={() => !disabled && onClick?.()}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.6 : 1,
+                transition:
+                    "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                transform:
+                    hovered && !disabled ? "translateY(-4px)" : "none",
+                boxShadow:
+                    hovered && !disabled
+                        ? "0 18px 28px -12px rgba(15,23,42,0.18)"
+                        : "0 1px 2px rgba(0,0,0,0.05)",
+                position: "relative",
+                overflow: "hidden",
+            }}
+        >
+            <Group justify="space-between" align="flex-start" mb="md">
+                <ThemeIcon
+                    size={44}
+                    radius={12}
+                    variant="light"
+                    color={color}
+                    style={{
+                        transition: "all 0.2s ease",
+                        transform:
+                            hovered && !disabled
+                                ? "scale(1.05)"
+                                : "scale(1)",
+                    }}
+                >
+                    {Icon && <Icon size={24} />}
+                </ThemeIcon>
+
+                {!disabled && (
+                    <Badge
+                        variant="dot"
+                        color={alert ? "orange" : "green"}
+                        size="xs"
+                        style={{
+                            backgroundColor: "white",
+                            border: "1px solid #e2e8f0",
+                        }}
+                    >
+                        {status}
+                    </Badge>
+                )}
+            </Group>
+
+            <Stack gap={4}>
+                {category && (
+                    <Text
+                        size="xs"
+                        fw={700}
+                        c="dimmed"
+                        tt="uppercase"
+                        style={{ letterSpacing: "0.5px" }}
+                    >
+                        {category}
+                    </Text>
+                )}
+                <Text
+                    size="lg"
+                    fw={700}
+                    c="dark.8"
+                    style={{ letterSpacing: "-0.3px" }}
+                >
+                    {title}
+                </Text>
+                {description && (
+                    <Text size="xs" c="dimmed" lineClamp={2} h={34}>
+                        {description}
+                    </Text>
+                )}
+            </Stack>
+
+            {/* Action bar */}
+            <Group mt="md" justify="space-between" align="center">
+                <div
+                    style={{
+                        height: 4,
+                        flex: 1,
+                        borderRadius: 2,
+                        background: active ? themeColor : "#f1f5f9",
+                        transition: "background 0.3s ease",
+                    }}
+                />
+
+                <Text
+                    size="xs"
+                    fw={600}
+                    c={color}
+                    style={{
+                        opacity: hovered && !disabled ? 1 : 0,
+                        transform:
+                            hovered && !disabled
+                                ? "translateX(0)"
+                                : "translateX(-5px)",
+                        transition:
+                            "opacity 0.2s ease, transform 0.2s ease",
+                        pointerEvents: "none",
+                    }}
+                >
+                    Open App →
+                </Text>
+            </Group>
+        </Card>
     );
 }
